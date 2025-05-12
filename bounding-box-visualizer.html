@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bounding Box Map Visualizer</title>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+  
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.5;
+      padding: 1rem;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      min-height: 600px;
+      width: 100%;
+    }
+    
+    .header {
+      background-color: #f3f4f6;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    
+    .title {
+      font-size: 1.25rem;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+    }
+    
+    .description {
+      font-size: 0.875rem;
+      color: #4b5563;
+      margin-bottom: 1rem;
+    }
+    
+    .map-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    
+    .map-button {
+      padding: 0.25rem 0.75rem;
+      border-radius: 0.25rem;
+      border: none;
+      cursor: pointer;
+      background-color: #e5e7eb;
+      font-size: 0.875rem;
+    }
+    
+    .map-button.active {
+      background-color: #3b82f6;
+      color: white;
+    }
+    
+    .content {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      flex: 1;
+    }
+    
+    .input-panel {
+      background-color: #f3f4f6;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      flex: 1;
+    }
+    
+    .map-panel {
+      background-color: #f3f4f6;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      flex: 2;
+    }
+    
+    .editor-container {
+      position: relative;
+      height: 200px;
+      font-family: monospace;
+      font-size: 0.875rem;
+      background-color: white;
+      border: 1px solid #d1d5db;
+      border-radius: 0.25rem;
+    }
+    
+    #input-textarea {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      resize: none;
+      border: none;
+      background-color: transparent;
+      color: transparent;
+      caret-color: black;
+      padding: 0.5rem;
+      font-family: inherit;
+      font-size: inherit;
+      line-height: inherit;
+      white-space: pre;
+      overflow: auto;
+      z-index: 2;
+      outline: none;
+    }
+    
+    #highlight-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      padding: 0.5rem;
+      white-space: pre;
+      overflow: auto;
+      pointer-events: none;
+      z-index: 1;
+    }
+    
+    .status {
+      margin-top: 0.5rem;
+      font-size: 0.875rem;
+      color: #4b5563;
+    }
+    
+    #map {
+      width: 100%;
+      height: 400px;
+      border: 1px solid #d1d5db;
+      border-radius: 0.25rem;
+    }
+    
+    /* For larger screens (desktop) */
+    @media (min-width: 1024px) {
+      .content {
+        flex-direction: row;
+      }
+      
+      .input-panel {
+        width: 33%;
+      }
+      
+      .map-panel {
+        width: 67%;
+      }
+    }
+    
+    /* Comment styling */
+    .line-comment {
+      color: #888;
+      font-style: italic;
+    }
+    
+    /* Bounding box styling - colors will be set dynamically */
+    .line-bounding-box {
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 class="title">Bounding Box Map Visualizer</h1>
+      <p class="description">Enter bounding boxes in the format: [west_lon, south_lat, east_lon, north_lat]</p>
+      
+      <div class="map-controls">
+        <button class="map-button" data-layer="googleStreets">Streets</button>
+        <button class="map-button" data-layer="googleTerrain">Terrain</button>
+        <button class="map-button active" data-layer="googleHybrid">Hybrid</button>
+      </div>
+    </div>
+    
+    <div class="content">
+      <div class="input-panel">
+        <div class="editor-container">
+          <textarea id="input-textarea" spellcheck="false"></textarea>
+          <pre id="highlight-container"></pre>
+        </div>
+        <div class="status">
+          <p id="box-count">Found 0 valid bounding boxes</p>
+        </div>
+      </div>
+      
+      <div class="map-panel">
+        <div id="map"></div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Leaflet JS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+  
+  <script>
+    // Main variables
+    let map;
+    let currentLayer = 'googleHybrid';
+    let boxLayers = [];
+    let parsedBoxes = [];
+    
+    // Colors for bounding boxes
+    const colors = [
+      '#ff5252', '#ff4081', '#e040fb', '#7c4dff', 
+      '#536dfe', '#448aff', '#40c4ff', '#18ffff', 
+      '#64ffda', '#69f0ae', '#b2ff59', '#eeff41', 
+      '#ffff00', '#ffd740', '#ffab40', '#ff6e40'
+    ];
+    
+    // Default example data
+    const defaultData = `# Example bounding boxes (format: [west_lon, south_lat, east_lon, north_lat])
+# San Francisco Bay Area
+[-122.5, 37.2, -121.7, 38.0]
+# Yosemite National Park
+[-119.9, 37.4, -119.2, 38.0]
+# Lake Tahoe
+[-120.3, 38.8, -119.9, 39.3]`;
+    
+    // Get DOM elements
+    const textarea = document.getElementById('input-textarea');
+    const highlightContainer = document.getElementById('highlight-container');
+    const boxCountElement = document.getElementById('box-count');
+    const mapButtons = document.querySelectorAll('.map-button');
+    
+    // Initialize the map
+    function initMap() {
+      // Create map instance
+      map = L.map('map').setView([37.7, -122.4], 6);
+      
+      // Define base layers
+      const baseLayers = {
+        googleStreets: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 20,
+          subdomains: ['a', 'b', 'c'],
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }),
+        googleTerrain: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 20,
+          subdomains: ['a', 'b', 'c'],
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }),
+        googleHybrid: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 20,
+          subdomains: ['a', 'b', 'c'],
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        })
+      };
+      
+      // Add the default base layer
+      baseLayers[currentLayer].addTo(map);
+      
+      // Add layer switch functionality to buttons
+      mapButtons.forEach(button => {
+        button.addEventListener('click', function() {
+          const layerName = this.getAttribute('data-layer');
+          
+          // Remove active class from all buttons
+          mapButtons.forEach(btn => btn.classList.remove('active'));
+          
+          // Add active class to clicked button
+          this.classList.add('active');
+          
+          // Remove current layer and add the selected one
+          if (map.hasLayer(baseLayers[currentLayer])) {
+            map.removeLayer(baseLayers[currentLayer]);
+          }
+          
+          currentLayer = layerName;
+          baseLayers[currentLayer].addTo(map);
+        });
+      });
+    }
+    
+    // Parse the input text to extract bounding boxes
+    function parseInput(text) {
+      const lines = text.split('\n');
+      const boxes = [];
+      
+      lines.forEach((line, index) => {
+        // Skip empty lines and comments
+        const trimmedLine = line.trim();
+        if (trimmedLine === '' || trimmedLine.startsWith('#')) {
+          return;
+        }
+        
+        // Try to extract the bounding box coordinates
+        try {
+          // Match pattern [num, num, num, num]
+          const match = trimmedLine.match(/\[([-\d.]+),\s*([-\d.]+),\s*([-\d.]+),\s*([-\d.]+)\]/);
+          if (match) {
+            const [_, west, south, east, north] = match.map(parseFloat);
+            // Validate coordinates
+            if (!isNaN(west) && !isNaN(south) && !isNaN(east) && !isNaN(north)) {
+              boxes.push({
+                bounds: [[south, west], [north, east]],
+                color: colors[boxes.length % colors.length],
+                index
+              });
+            }
+          }
+        } catch (e) {
+          console.error("Error parsing line:", line, e);
+        }
+      });
+      
+      return boxes;
+    }
+    
+    // Update the syntax highlighting
+    function updateHighlighting() {
+      const text = textarea.value;
+      const lines = text.split('\n');
+      
+      // Clear the highlight container
+      highlightContainer.innerHTML = '';
+      
+      // Process each line
+      lines.forEach((line, index) => {
+        const lineSpan = document.createElement('span');
+        lineSpan.textContent = line + (index < lines.length - 1 ? '\n' : '');
+        
+        // Check if this is a bounding box line
+        const boxIndex = parsedBoxes.findIndex(box => box.index === index);
+        
+        if (boxIndex >= 0) {
+          // This is a bounding box line
+          const boxColor = parsedBoxes[boxIndex].color;
+          lineSpan.classList.add('line-bounding-box');
+          lineSpan.style.color = boxColor;
+          lineSpan.style.backgroundColor = boxColor + '20'; // 12.5% opacity
+        } else if (line.trim().startsWith('#')) {
+          // This is a comment line
+          lineSpan.classList.add('line-comment');
+        }
+        
+        highlightContainer.appendChild(lineSpan);
+      });
+    }
+    
+    // Update the map with bounding boxes
+    function updateMapBoxes() {
+      // Remove existing box layers
+      boxLayers.forEach(layer => {
+        if (map.hasLayer(layer)) {
+          map.removeLayer(layer);
+        }
+      });
+      
+      boxLayers = [];
+      
+      // Add new box layers
+      parsedBoxes.forEach(box => {
+        const rectangle = L.rectangle(box.bounds, {
+          color: box.color,
+          weight: 3,
+          fillOpacity: 0.2
+        });
+        
+        rectangle.addTo(map);
+        boxLayers.push(rectangle);
+      });
+      
+      // Update the box count display
+      boxCountElement.textContent = `Found ${parsedBoxes.length} valid bounding boxes`;
+      
+      // If there are boxes, fit the map to show all of them
+      if (boxLayers.length > 0) {
+        const group = L.featureGroup(boxLayers);
+        map.fitBounds(group.getBounds(), { padding: [50, 50] });
+      }
+    }
+    
+    // Process input and update everything
+    function processInput() {
+      const inputText = textarea.value;
+      parsedBoxes = parseInput(inputText);
+      
+      updateHighlighting();
+      updateMapBoxes();
+    }
+    
+    // Initialize everything
+    function init() {
+      // Set default text
+      textarea.value = defaultData;
+      
+      // Initialize the map
+      initMap();
+      
+      // Set up the text input events
+      textarea.addEventListener('input', processInput);
+      
+      // Process initial input
+      processInput();
+      
+      // Sync the scroll positions between textarea and highlighting
+      textarea.addEventListener('scroll', () => {
+        highlightContainer.scrollTop = textarea.scrollTop;
+        highlightContainer.scrollLeft = textarea.scrollLeft;
+      });
+    }
+    
+    // Start when DOM is ready
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
