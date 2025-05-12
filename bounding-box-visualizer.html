@@ -268,60 +268,76 @@
 
     /* Top-left corner (⌜) */
     .corner-tl::before {
-      top: 7px;
-      left: 7px;
+      border-top: 1px solid white;
+      border-left: 1px solid white;
+      top: 6px;
+      left: 6px;
       width: 10px;
       height: 2px;
     }
 
     .corner-tl::after {
-      top: 7px;
-      left: 7px;
+      border-top: 1px solid white;
+      border-left: 1px solid white;
+      top: 6px;
+      left: 6px;
       width: 2px;
       height: 10px;
     }
 
     /* Top-right corner (⌝) */
     .corner-tr::before {
-      top: 7px;
-      right: 7px;
+      border-top: 1px solid white;
+      border-right: 1px solid white;
+      top: 6px;
+      right: 6px;
       width: 10px;
       height: 2px;
     }
 
     .corner-tr::after {
-      top: 7px;
-      right: 7px;
+      border-top: 1px solid white;
+      border-right: 1px solid white;
+      top: 6px;
+      right: 6px;
       width: 2px;
       height: 10px;
     }
 
     /* Bottom-left corner (⌞) */
     .corner-bl::before {
-      bottom: 7px;
-      left: 7px;
+      border-bottom: 1px solid white;
+      border-left: 1px solid white;
+      bottom: 6px;
+      left: 6px;
       width: 10px;
       height: 2px;
     }
 
     .corner-bl::after {
-      bottom: 7px;
-      left: 7px;
+      border-bottom: 1px solid white;
+      border-left: 1px solid white;
+      bottom: 6px;
+      left: 6px;
       width: 2px;
       height: 10px;
     }
 
     /* Bottom-right corner (⌟) */
     .corner-br::before {
-      bottom: 7px;
-      right: 7px;
+      border-bottom: 1px solid white;
+      border-right: 1px solid white;
+      bottom: 6px;
+      right: 6px;
       width: 10px;
       height: 2px;
     }
 
     .corner-br::after {
-      bottom: 7px;
-      right: 7px;
+      border-bottom: 1px solid white;
+      border-right: 1px solid white;
+      bottom: 6px;
+      right: 6px;
       width: 2px;
       height: 10px;
     }
@@ -634,6 +650,11 @@
       // Update the actual rectangle bounds to match the rounded coordinates
       rectangle.setBounds([[south, west], [north, east]]);
 
+      // Update the white border if it exists
+      if (rectangle.whiteBorder) {
+        rectangle.whiteBorder.setBounds([[south, west], [north, east]]);
+      }
+
       // Update the marker positions to match the new bounds
       if (rectangle.cornerMarkers) {
         updateMarkerPositions(rectangle, rectangle.cornerMarkers);
@@ -776,6 +797,11 @@
         // Update rectangle geometry
         rectangle.setBounds(newBounds);
 
+        // Update white border if it exists
+        if (rectangle.whiteBorder) {
+          rectangle.whiteBorder.setBounds(newBounds);
+        }
+
         // Update other markers
         updateMarkerPositions(rectangle, [nwMarker, neMarker, swMarker, seMarker]);
       }
@@ -804,7 +830,7 @@
       // Clear existing editable layers
       editableLayers.clearLayers();
 
-      // Remove existing corner markers
+      // Remove existing corner markers and white borders
       boxLayers.forEach(rectangle => {
         if (rectangle.cornerMarkers) {
           rectangle.cornerMarkers.forEach(marker => {
@@ -813,20 +839,36 @@
             }
           });
         }
+
+        // Remove white border if it exists
+        if (rectangle.whiteBorder && map.hasLayer(rectangle.whiteBorder)) {
+          map.removeLayer(rectangle.whiteBorder);
+        }
       });
 
       boxLayers = [];
 
       // Add new box layers
       parsedBoxes.forEach((box, index) => {
+        // Create a white outline rectangle first (1px larger on all sides)
+        const whiteBorder = L.rectangle(box.bounds, {
+          color: 'white',
+          weight: 2, // Slightly thicker for the outer white border
+          fillOpacity: 0,
+          fillColor: 'transparent',
+          interactive: false // Don't interact with this layer
+        }).addTo(map);
+
+        // Create the main colored rectangle
         const rectangle = L.rectangle(box.bounds, {
           color: box.color,
-          weight: 1, // Thin border
+          weight: 1, // Thin colored border
           fillOpacity: 0.2
         });
 
-        // Store the box index
+        // Store the box index and reference to white border
         rectangle.boxIndex = index;
+        rectangle.whiteBorder = whiteBorder;
 
         // Add to editable layers
         editableLayers.addLayer(rectangle);
