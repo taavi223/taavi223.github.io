@@ -1,23 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Interactive Bounding Box Map Visualizer</title>
-  
+
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
-  
+
   <!-- Leaflet.Draw CSS -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
-  
+
   <style>
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
     }
-    
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       line-height: 1.5;
@@ -26,7 +27,7 @@
       display: flex;
       flex-direction: column;
     }
-    
+
     .container {
       display: flex;
       flex-direction: column;
@@ -35,26 +36,26 @@
       width: 100%;
       flex: 1;
     }
-    
+
     .header {
       background-color: #f3f4f6;
       padding: 1rem;
       border-radius: 0.5rem;
       margin-bottom: 1rem;
     }
-    
+
     .title {
       font-size: 1.25rem;
       font-weight: bold;
       margin-bottom: 0.5rem;
     }
-    
+
     .description {
       font-size: 0.875rem;
       color: #4b5563;
       margin-bottom: 1rem;
     }
-    
+
     .controls-row {
       display: flex;
       flex-wrap: wrap;
@@ -63,24 +64,24 @@
       align-items: center;
       justify-content: space-between;
     }
-    
+
     .map-controls {
       display: flex;
       flex-wrap: wrap;
       gap: 0.5rem;
     }
-    
+
     .precision-controls {
       display: flex;
       align-items: center;
       gap: 0.5rem;
     }
-    
+
     .precision-label {
       font-size: 0.875rem;
       color: #4b5563;
     }
-    
+
     .precision-select {
       padding: 0.25rem;
       border-radius: 0.25rem;
@@ -88,7 +89,7 @@
       font-size: 0.875rem;
       min-width: 4rem;
     }
-    
+
     .map-button {
       padding: 0.25rem 0.75rem;
       border-radius: 0.25rem;
@@ -97,20 +98,21 @@
       background-color: #e5e7eb;
       font-size: 0.875rem;
     }
-    
+
     .map-button.active {
       background-color: #3b82f6;
       color: white;
     }
-    
+
     .content {
       display: flex;
       flex-direction: column;
       gap: 1rem;
       flex: 1;
-      min-height: 0; /* Important for proper flexbox behavior */
+      min-height: 0;
+      /* Important for proper flexbox behavior */
     }
-    
+
     .input-panel {
       background-color: #f3f4f6;
       padding: 1rem;
@@ -118,9 +120,10 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      min-height: 0; /* Important for proper flexbox behavior */
+      min-height: 0;
+      /* Important for proper flexbox behavior */
     }
-    
+
     .map-panel {
       background-color: #f3f4f6;
       padding: 1rem;
@@ -128,9 +131,10 @@
       flex: 2;
       display: flex;
       flex-direction: column;
-      min-height: 0; /* Important for proper flexbox behavior */
+      min-height: 0;
+      /* Important for proper flexbox behavior */
     }
-    
+
     .editor-container {
       position: relative;
       flex: 1;
@@ -141,7 +145,7 @@
       border: 1px solid #d1d5db;
       border-radius: 0.25rem;
     }
-    
+
     #input-textarea {
       position: absolute;
       top: 0;
@@ -162,7 +166,7 @@
       z-index: 2;
       outline: none;
     }
-    
+
     #highlight-container {
       position: absolute;
       top: 0;
@@ -175,13 +179,13 @@
       pointer-events: none;
       z-index: 1;
     }
-    
+
     .status {
       margin-top: 0.5rem;
       font-size: 0.875rem;
       color: #4b5563;
     }
-    
+
     #map {
       width: 100%;
       flex: 1;
@@ -189,44 +193,44 @@
       border: 1px solid #d1d5db;
       border-radius: 0.25rem;
     }
-    
+
     /* For larger screens (desktop) */
     @media (min-width: 1280px) {
       .content {
         flex-direction: row;
       }
-      
+
       .input-panel {
         width: 640px;
         flex: none;
       }
-      
+
       .map-panel {
         flex: 1;
       }
     }
-    
+
     /* Comment styling */
     .line-comment {
       color: #888;
       font-style: italic;
     }
-    
+
     /* Bounding box styling - colors will be set dynamically */
     .line-bounding-box {
       font-weight: bold;
     }
-    
+
     /* Hide the default Leaflet.Draw toolbar */
     .leaflet-draw.leaflet-control {
       display: none;
     }
-    
+
     /* Hide tooltips */
     .leaflet-draw-tooltip {
       display: none !important;
     }
-    
+
     /* Hide all middle markers - these are the ones on the sides of the rectangle */
     .leaflet-edit-marker-middle,
     .leaflet-edit-marker.leaflet-edit-marker-middle,
@@ -235,12 +239,12 @@
     [class*="-marker-middle"] {
       display: none !important;
     }
-    
+
     /* Hide any unwanted center markers */
     .leaflet-marker-icon:not(.corner-handle) {
       display: none !important;
     }
-    
+
     /* Basic style for corner handles */
     .corner-handle {
       width: 20px !important;
@@ -252,7 +256,7 @@
       position: absolute !important;
       z-index: 1000 !important;
     }
-    
+
     /* L-shaped corner handle styles */
     .corner-handle::before,
     .corner-handle::after {
@@ -261,7 +265,7 @@
       background-color: black;
       display: block;
     }
-    
+
     /* Top-left corner (⌜) */
     .corner-tl::before {
       top: 7px;
@@ -269,14 +273,14 @@
       width: 10px;
       height: 2px;
     }
-    
+
     .corner-tl::after {
       top: 7px;
       left: 7px;
       width: 2px;
       height: 10px;
-    }    
-    
+    }
+
     /* Top-right corner (⌝) */
     .corner-tr::before {
       top: 7px;
@@ -284,14 +288,14 @@
       width: 10px;
       height: 2px;
     }
-    
+
     .corner-tr::after {
       top: 7px;
       right: 7px;
       width: 2px;
       height: 10px;
     }
-    
+
     /* Bottom-left corner (⌞) */
     .corner-bl::before {
       bottom: 7px;
@@ -299,14 +303,14 @@
       width: 10px;
       height: 2px;
     }
-    
+
     .corner-bl::after {
       bottom: 7px;
       left: 7px;
       width: 2px;
       height: 10px;
     }
-    
+
     /* Bottom-right corner (⌟) */
     .corner-br::before {
       bottom: 7px;
@@ -314,7 +318,7 @@
       width: 10px;
       height: 2px;
     }
-    
+
     .corner-br::after {
       bottom: 7px;
       right: 7px;
@@ -323,19 +327,21 @@
     }
   </style>
 </head>
+
 <body>
   <div class="container">
     <div class="header">
       <h1 class="title">Interactive Bounding Box Map Visualizer</h1>
-      <p class="description">Enter bounding boxes in the format: [west_lon, south_lat, east_lon, north_lat] - click and drag corners to resize.</p>
-      
+      <p class="description">Enter bounding boxes in the format: [west_lon, south_lat, east_lon, north_lat] - click and
+        drag corners to resize.</p>
+
       <div class="controls-row">
         <div class="map-controls">
-          <button class="map-button" data-layer="streets">Streets</button>
+          <button class="map-button active" data-layer="streets">Streets</button>
           <button class="map-button" data-layer="terrain">Terrain</button>
-          <button class="map-button active" data-layer="hybrid">Hybrid</button>
+          <button class="map-button" data-layer="hybrid">Hybrid</button>
         </div>
-        
+
         <div class="precision-controls">
           <label class="precision-label" for="precision-select">Coordinate Precision:</label>
           <select class="precision-select" id="precision-select">
@@ -350,7 +356,7 @@
         </div>
       </div>
     </div>
-    
+
     <div class="content">
       <div class="input-panel">
         <div class="editor-container">
@@ -361,36 +367,36 @@
           <p id="box-count">Found 0 valid bounding boxes</p>
         </div>
       </div>
-      
+
       <div class="map-panel">
         <div id="map"></div>
       </div>
     </div>
   </div>
-  
+
   <!-- Leaflet JS -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
-  
+
   <!-- Leaflet.Draw JS -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
-  
+
   <script>
     // Main variables
     let map;
-    let currentLayer = 'hybrid';
+    let currentLayer = 'streets';
     let boxLayers = [];
     let parsedBoxes = [];
     let editableLayers;
     let coordinatePrecision = 6; // Default precision (decimal places)
-    
+
     // Colors for bounding boxes
     const colors = [
-      '#ff5252', '#ff4081', '#e040fb', '#7c4dff', 
-      '#536dfe', '#448aff', '#40c4ff', '#18ffff', 
-      '#64ffda', '#69f0ae', '#b2ff59', '#eeff41', 
+      '#ff5252', '#ff4081', '#e040fb', '#7c4dff',
+      '#536dfe', '#448aff', '#40c4ff', '#18ffff',
+      '#64ffda', '#69f0ae', '#b2ff59', '#eeff41',
       '#ffff00', '#ffd740', '#ffab40', '#ff6e40'
     ];
-    
+
     // Default example data
     const defaultData = `# Example bounding boxes (format: [west_lon, south_lat, east_lon, north_lat])
 # San Francisco Bay Area
@@ -399,25 +405,25 @@
 [-119.9, 37.4, -119.2, 38.0]
 # Lake Tahoe
 [-120.3, 38.8, -119.9, 39.3]`;
-    
+
     // Get DOM elements
     const textarea = document.getElementById('input-textarea');
     const highlightContainer = document.getElementById('highlight-container');
     const boxCountElement = document.getElementById('box-count');
     const mapButtons = document.querySelectorAll('.map-button');
     const precisionSelect = document.getElementById('precision-select');
-    
+
     // Round a number to the specified precision
     function roundToPrecision(num, precision) {
       const factor = Math.pow(10, precision);
       return Math.round(num * factor) / factor;
     }
-    
+
     // Initialize the map
     function initMap() {
       // Create map instance
       map = L.map('map').setView([37.7, -122.4], 6);
-      
+
       // Define base layers
       const baseLayers = {
         streets: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -425,66 +431,67 @@
           subdomains: ['a', 'b', 'c'],
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }),
-        terrain: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19,
-          subdomains: ['a', 'b', 'c'],
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        terrain: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+          attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a>'
         }),
-        hybrid: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19,
-          subdomains: ['a', 'b', 'c'],
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        })
+        hybrid: L.tileLayer(
+          'https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryTopo/MapServer/tile/{z}/{y}/{x}',
+          {
+            maxZoom: 20,
+            attribution: 'USGS Imagery Topo'
+          }
+        )
       };
-      
+
+
       // Add the default base layer
       baseLayers[currentLayer].addTo(map);
-      
+
       // Initialize editable layer group
       editableLayers = new L.FeatureGroup();
       map.addLayer(editableLayers);
-      
+
       // Add layer switch functionality to buttons
       mapButtons.forEach(button => {
-        button.addEventListener('click', function() {
+        button.addEventListener('click', function () {
           const layerName = this.getAttribute('data-layer');
-          
+
           // Remove active class from all buttons
           mapButtons.forEach(btn => btn.classList.remove('active'));
-          
+
           // Add active class to clicked button
           this.classList.add('active');
-          
+
           // Remove current layer and add the selected one
           if (map.hasLayer(baseLayers[currentLayer])) {
             map.removeLayer(baseLayers[currentLayer]);
           }
-          
+
           currentLayer = layerName;
           baseLayers[currentLayer].addTo(map);
         });
       });
-      
+
       // Add map mouseup handler to catch all changes
-      map.on('mouseup', function() {
+      map.on('mouseup', function () {
         boxLayers.forEach(box => {
           updateBoxCoordinates(box);
         });
       });
     }
-    
+
     // Parse the input text to extract bounding boxes
     function parseInput(text) {
       const lines = text.split('\n');
       const boxes = [];
-      
+
       lines.forEach((line, index) => {
         // Skip empty lines and comments
         const trimmedLine = line.trim();
         if (trimmedLine === '' || trimmedLine.startsWith('#')) {
           return;
         }
-        
+
         // Try to extract the bounding box coordinates
         try {
           // Match pattern [num, num, num, num]
@@ -498,15 +505,15 @@
               const roundedSouth = roundToPrecision(south, coordinatePrecision);
               const roundedEast = roundToPrecision(east, coordinatePrecision);
               const roundedNorth = roundToPrecision(north, coordinatePrecision);
-              
+
               boxes.push({
                 bounds: [[roundedSouth, roundedWest], [roundedNorth, roundedEast]],
                 color: colors[boxes.length % colors.length],
                 index,
                 line: line,
-                west: roundedWest, 
-                south: roundedSouth, 
-                east: roundedEast, 
+                west: roundedWest,
+                south: roundedSouth,
+                east: roundedEast,
                 north: roundedNorth
               });
             }
@@ -515,26 +522,26 @@
           console.error("Error parsing line:", line, e);
         }
       });
-      
+
       return boxes;
     }
-    
+
     // Update the syntax highlighting
     function updateHighlighting() {
       const text = textarea.value;
       const lines = text.split('\n');
-      
+
       // Clear the highlight container
       highlightContainer.innerHTML = '';
-      
+
       // Process each line
       lines.forEach((line, index) => {
         const lineSpan = document.createElement('span');
         lineSpan.textContent = line + (index < lines.length - 1 ? '\n' : '');
-        
+
         // Check if this is a bounding box line
         const boxIndex = parsedBoxes.findIndex(box => box.index === index);
-        
+
         if (boxIndex >= 0) {
           // This is a bounding box line
           const boxColor = parsedBoxes[boxIndex].color;
@@ -545,22 +552,22 @@
           // This is a comment line
           lineSpan.classList.add('line-comment');
         }
-        
+
         highlightContainer.appendChild(lineSpan);
       });
     }
-    
+
     // Update the text in the textarea when a box is transformed
     function updateBoxCoordinates(rectangle) {
       // Find associated parsed box by comparing bounds
       const bounds = rectangle.getBounds();
-      
+
       // Round coordinates to the current precision
       const west = roundToPrecision(bounds.getWest(), coordinatePrecision);
       const south = roundToPrecision(bounds.getSouth(), coordinatePrecision);
       const east = roundToPrecision(bounds.getEast(), coordinatePrecision);
       const north = roundToPrecision(bounds.getNorth(), coordinatePrecision);
-      
+
       // Find the box index by checking the boxIndex property
       let boxIndex = -1;
       if (rectangle.boxIndex !== undefined) {
@@ -571,23 +578,23 @@
         parsedBoxes.forEach((box, idx) => {
           const boxCenter = [(box.north + box.south) / 2, (box.east + box.west) / 2];
           const rectCenter = [(north + south) / 2, (east + west) / 2];
-          
+
           const distance = Math.sqrt(
-            Math.pow(boxCenter[0] - rectCenter[0], 2) + 
+            Math.pow(boxCenter[0] - rectCenter[0], 2) +
             Math.pow(boxCenter[1] - rectCenter[1], 2)
           );
-          
+
           if (distance < minDistance) {
             minDistance = distance;
             boxIndex = idx;
           }
         });
       }
-      
+
       if (boxIndex === -1 || boxIndex >= parsedBoxes.length) {
         return;
       }
-      
+
       // Format the new coordinates string based on precision
       let newCoordinates;
       if (coordinatePrecision === 0) {
@@ -596,47 +603,47 @@
       } else {
         newCoordinates = `[${west.toFixed(coordinatePrecision)}, ${south.toFixed(coordinatePrecision)}, ${east.toFixed(coordinatePrecision)}, ${north.toFixed(coordinatePrecision)}]`;
       }
-      
+
       // Update the box object
       parsedBoxes[boxIndex].west = west;
       parsedBoxes[boxIndex].south = south;
       parsedBoxes[boxIndex].east = east;
       parsedBoxes[boxIndex].north = north;
       parsedBoxes[boxIndex].bounds = [[south, west], [north, east]];
-      
+
       // Get the current text and lines
       const text = textarea.value;
       const lines = text.split('\n');
-      
+
       // Replace the old coordinates in the line
       const oldLine = lines[parsedBoxes[boxIndex].index];
       const newLine = oldLine.replace(/\[[-\d.,\s]+\]/, newCoordinates);
-      
+
       // Update the line in the array
       lines[parsedBoxes[boxIndex].index] = newLine;
-      
+
       // Update the box's line property
       parsedBoxes[boxIndex].line = newLine;
-      
+
       // Join back the lines and update the textarea
       textarea.value = lines.join('\n');
-      
+
       // Update syntax highlighting
       updateHighlighting();
-      
+
       // Update the actual rectangle bounds to match the rounded coordinates
       rectangle.setBounds([[south, west], [north, east]]);
-      
+
       // Update the marker positions to match the new bounds
       if (rectangle.cornerMarkers) {
         updateMarkerPositions(rectangle, rectangle.cornerMarkers);
       }
     }
-    
+
     // Update marker positions when the rectangle changes
     function updateMarkerPositions(rectangle, markers) {
       const bounds = rectangle.getBounds();
-      
+
       markers.forEach(marker => {
         if (marker.corner === 'nw') {
           marker.setLatLng(bounds.getNorthWest());
@@ -649,18 +656,18 @@
         }
       });
     }
-    
+
     // Create custom corner handles for a rectangle
     function createCustomCornerHandles(rectangle) {
       // Get the LatLngBounds object
       const bounds = rectangle.getBounds();
-      
+
       // Get corner coordinates
       const northWest = bounds.getNorthWest();
       const northEast = bounds.getNorthEast();
       const southWest = bounds.getSouthWest();
       const southEast = bounds.getSouthEast();
-      
+
       // Define marker options
       const markerOptions = {
         draggable: true,
@@ -669,31 +676,31 @@
           iconSize: [20, 20]
         })
       };
-      
+
       // Create markers for each corner
       const nwMarker = L.marker(northWest, markerOptions);
       const neMarker = L.marker(northEast, markerOptions);
       const swMarker = L.marker(southWest, markerOptions);
       const seMarker = L.marker(southEast, markerOptions);
-      
+
       // Add markers to map
       nwMarker.addTo(map);
       neMarker.addTo(map);
       swMarker.addTo(map);
       seMarker.addTo(map);
-      
+
       // Store reference to rectangle
       nwMarker.rectangle = rectangle;
       neMarker.rectangle = rectangle;
       swMarker.rectangle = rectangle;
       seMarker.rectangle = rectangle;
-      
+
       // Set corner positions
       nwMarker.corner = 'nw';
       neMarker.corner = 'ne';
       swMarker.corner = 'sw';
       seMarker.corner = 'se';
-      
+
       // Style the marker elements
       setTimeout(() => {
         // Get the DOM elements
@@ -701,50 +708,50 @@
         const neEl = neMarker.getElement();
         const swEl = swMarker.getElement();
         const seEl = seMarker.getElement();
-        
+
         // Add corner-specific classes
         if (nwEl) {
           nwEl.classList.add('corner-tl');
           nwEl.style.cursor = 'nwse-resize';
         }
-        
+
         if (neEl) {
           neEl.classList.add('corner-tr');
           neEl.style.cursor = 'nesw-resize';
         }
-        
+
         if (swEl) {
           swEl.classList.add('corner-bl');
           swEl.style.cursor = 'nesw-resize';
         }
-        
+
         if (seEl) {
           seEl.classList.add('corner-br');
           seEl.style.cursor = 'nwse-resize';
         }
       }, 100);
-      
+
       // Handle marker drag events
       function onMarkerDrag(e) {
         const marker = e.target;
         const rectangle = marker.rectangle;
         const corner = marker.corner;
         const bounds = rectangle.getBounds();
-        
+
         // Get the current bounds coordinates
         let north = bounds.getNorth();
         let south = bounds.getSouth();
         let east = bounds.getEast();
         let west = bounds.getWest();
-        
+
         // Get the marker's current position
         const lat = marker.getLatLng().lat;
         const lng = marker.getLatLng().lng;
-        
+
         // Round the coordinates to the current precision
         const roundedLat = roundToPrecision(lat, coordinatePrecision);
         const roundedLng = roundToPrecision(lng, coordinatePrecision);
-        
+
         // Update the appropriate corner coordinates
         if (corner === 'nw') {
           north = roundedLat;
@@ -759,44 +766,44 @@
           south = roundedLat;
           east = roundedLng;
         }
-        
+
         // Create new bounds
         const newBounds = L.latLngBounds([
           [south, west],
           [north, east]
         ]);
-        
+
         // Update rectangle geometry
         rectangle.setBounds(newBounds);
-        
+
         // Update other markers
         updateMarkerPositions(rectangle, [nwMarker, neMarker, swMarker, seMarker]);
       }
-      
+
       function onMarkerDragEnd(e) {
         updateBoxCoordinates(e.target.rectangle);
       }
-      
+
       // Add event listeners
       nwMarker.on('drag', onMarkerDrag);
       neMarker.on('drag', onMarkerDrag);
       swMarker.on('drag', onMarkerDrag);
       seMarker.on('drag', onMarkerDrag);
-      
+
       nwMarker.on('dragend', onMarkerDragEnd);
       neMarker.on('dragend', onMarkerDragEnd);
       swMarker.on('dragend', onMarkerDragEnd);
       seMarker.on('dragend', onMarkerDragEnd);
-      
+
       // Store markers in rectangle for later reference
       rectangle.cornerMarkers = [nwMarker, neMarker, swMarker, seMarker];
     }
-    
+
     // Update the map with bounding boxes
     function updateMapBoxes() {
       // Clear existing editable layers
       editableLayers.clearLayers();
-      
+
       // Remove existing corner markers
       boxLayers.forEach(rectangle => {
         if (rectangle.cornerMarkers) {
@@ -807,9 +814,9 @@
           });
         }
       });
-      
+
       boxLayers = [];
-      
+
       // Add new box layers
       parsedBoxes.forEach((box, index) => {
         const rectangle = L.rectangle(box.bounds, {
@@ -817,78 +824,78 @@
           weight: 1, // Thin border
           fillOpacity: 0.2
         });
-        
+
         // Store the box index
         rectangle.boxIndex = index;
-        
+
         // Add to editable layers
         editableLayers.addLayer(rectangle);
         boxLayers.push(rectangle);
-        
+
         // Create custom corner handles for this rectangle
         createCustomCornerHandles(rectangle);
       });
-      
+
       // Update the box count display
       boxCountElement.textContent = `Found ${parsedBoxes.length} valid bounding boxes`;
-      
+
       // If there are boxes, fit the map to show all of them
       if (boxLayers.length > 0) {
         const group = L.featureGroup(boxLayers);
         map.fitBounds(group.getBounds(), { padding: [50, 50] });
       }
     }
-    
+
     // Process input and update everything
     function processInput() {
       const inputText = textarea.value;
       parsedBoxes = parseInput(inputText);
-      
+
       updateHighlighting();
       updateMapBoxes();
     }
-    
+
     // Handle manual edits in the text input
     function handleTextareaInput() {
       processInput();
     }
-    
+
     // Handle precision change
     function handlePrecisionChange() {
       // Get the new precision value
       coordinatePrecision = parseInt(precisionSelect.value);
-      
+
       // Update all boxes with the new precision
       boxLayers.forEach(rectangle => {
         updateBoxCoordinates(rectangle);
       });
     }
-    
+
     // Initialize everything
     function init() {
       // Set default text
       textarea.value = defaultData;
-      
+
       // Set up precision selector
       precisionSelect.addEventListener('change', handlePrecisionChange);
-      
+
       // Initialize the map
       initMap();
-      
+
       // Set up the text input events
       textarea.addEventListener('input', handleTextareaInput);
-      
+
       // Process initial input
       processInput();
-      
+
       // Sync the scroll positions between textarea and highlighting
       textarea.addEventListener('scroll', () => {
         highlightContainer.scrollTop = textarea.scrollTop;
         highlightContainer.scrollLeft = textarea.scrollLeft;
       });
-      
+
       // Add observer to update corner markers when panning or zooming
-      map.on('moveend', function() {
+      map.on('moveend', function () {
         boxLayers.forEach(rectangle => {
           if (rectangle.cornerMarkers) {
             // Update marker positions
@@ -906,17 +913,18 @@
           }
         });
       });
-      
+
       // Handle window resize to make sure map takes full height
-      window.addEventListener('resize', function() {
+      window.addEventListener('resize', function () {
         if (map) {
           map.invalidateSize();
         }
       });
     }
-    
+
     // Start when DOM is ready
     document.addEventListener('DOMContentLoaded', init);
   </script>
 </body>
+
 </html>
