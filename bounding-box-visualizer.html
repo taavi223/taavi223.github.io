@@ -55,11 +55,38 @@
       margin-bottom: 1rem;
     }
     
+    .controls-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
     .map-controls {
       display: flex;
       flex-wrap: wrap;
       gap: 0.5rem;
-      margin-bottom: 1rem;
+    }
+    
+    .precision-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .precision-label {
+      font-size: 0.875rem;
+      color: #4b5563;
+    }
+    
+    .precision-select {
+      padding: 0.25rem;
+      border-radius: 0.25rem;
+      border: 1px solid #d1d5db;
+      font-size: 0.875rem;
+      min-width: 4rem;
     }
     
     .map-button {
@@ -302,10 +329,25 @@
       <h1 class="title">Interactive Bounding Box Map Visualizer</h1>
       <p class="description">Enter bounding boxes in the format: [west_lon, south_lat, east_lon, north_lat] - click and drag corners to resize.</p>
       
-      <div class="map-controls">
-        <button class="map-button" data-layer="streets">Streets</button>
-        <button class="map-button" data-layer="terrain">Terrain</button>
-        <button class="map-button active" data-layer="hybrid">Hybrid</button>
+      <div class="controls-row">
+        <div class="map-controls">
+          <button class="map-button" data-layer="streets">Streets</button>
+          <button class="map-button" data-layer="terrain">Terrain</button>
+          <button class="map-button active" data-layer="hybrid">Hybrid</button>
+        </div>
+        
+        <div class="precision-controls">
+          <label class="precision-label" for="precision-select">Coordinate Precision:</label>
+          <select class="precision-select" id="precision-select">
+            <option value="0">0 decimals</option>
+            <option value="1">1 decimal</option>
+            <option value="2">2 decimals</option>
+            <option value="3">3 decimals</option>
+            <option value="4">4 decimals</option>
+            <option value="5">5 decimals</option>
+            <option value="6" selected>6 decimals</option>
+          </select>
+        </div>
       </div>
     </div>
     
@@ -339,6 +381,7 @@
     let boxLayers = [];
     let parsedBoxes = [];
     let editableLayers;
+    let coordinatePrecision = 6; // Default precision (decimal places)
     
     // Colors for bounding boxes
     const colors = [
@@ -362,6 +405,13 @@
     const highlightContainer = document.getElementById('highlight-container');
     const boxCountElement = document.getElementById('box-count');
     const mapButtons = document.querySelectorAll('.map-button');
+    const precisionSelect = document.getElementById('precision-select');
+    
+    // Round a number to the specified precision
+    function roundToPrecision(num, precision) {
+      const factor = Math.pow(10, precision);
+      return Math.round(num * factor) / factor;
+    }
     
     // Initialize the map
     function initMap() {
@@ -443,12 +493,21 @@
             const [_, west, south, east, north] = match.map(parseFloat);
             // Validate coordinates
             if (!isNaN(west) && !isNaN(south) && !isNaN(east) && !isNaN(north)) {
+              // Round coordinates to the current precision
+              const roundedWest = roundToPrecision(west, coordinatePrecision);
+              const roundedSouth = roundToPrecision(south, coordinatePrecision);
+              const roundedEast = roundToPrecision(east, coordinatePrecision);
+              const roundedNorth = roundToPrecision(north, coordinatePrecision);
+              
               boxes.push({
-                bounds: [[south, west], [north, east]],
+                bounds: [[roundedSouth, roundedWest], [roundedNorth, roundedEast]],
                 color: colors[boxes.length % colors.length],
                 index,
                 line: line,
-                west, south, east, north
+                west: roundedWest, 
+                south: roundedSouth, 
+                east: roundedEast, 
+                north: roundedNorth
               });
             }
           }
@@ -495,10 +554,12 @@
     function updateBoxCoordinates(rectangle) {
       // Find associated parsed box by comparing bounds
       const bounds = rectangle.getBounds();
-      const west = bounds.getWest().toFixed(6);
-      const south = bounds.getSouth().toFixed(6);
-      const east = bounds.getEast().toFixed(6);
-      const north = bounds.getNorth().toFixed(6);
+      
+      // Round coordinates to the current precision
+      const west = roundToPrecision(bounds.getWest(), coordinatePrecision);
+      const south = roundToPrecision(bounds.getSouth(), coordinatePrecision);
+      const east = roundToPrecision(bounds.getEast(), coordinatePrecision);
+      const north = roundToPrecision(bounds.getNorth(), coordinatePrecision);
       
       // Find the box index by checking the boxIndex property
       let boxIndex = -1;
@@ -509,7 +570,7 @@
         let minDistance = Infinity;
         parsedBoxes.forEach((box, idx) => {
           const boxCenter = [(box.north + box.south) / 2, (box.east + box.west) / 2];
-          const rectCenter = [(parseFloat(north) + parseFloat(south)) / 2, (parseFloat(east) + parseFloat(west)) / 2];
+          const rectCenter = [(north + south) / 2, (east + west) / 2];
           
           const distance = Math.sqrt(
             Math.pow(boxCenter[0] - rectCenter[0], 2) + 
@@ -527,15 +588,21 @@
         return;
       }
       
-      // Format the new coordinates string
-      const newCoordinates = `[${west}, ${south}, ${east}, ${north}]`;
+      // Format the new coordinates string based on precision
+      let newCoordinates;
+      if (coordinatePrecision === 0) {
+        // No decimal places
+        newCoordinates = `[${west.toFixed(0)}, ${south.toFixed(0)}, ${east.toFixed(0)}, ${north.toFixed(0)}]`;
+      } else {
+        newCoordinates = `[${west.toFixed(coordinatePrecision)}, ${south.toFixed(coordinatePrecision)}, ${east.toFixed(coordinatePrecision)}, ${north.toFixed(coordinatePrecision)}]`;
+      }
       
       // Update the box object
-      parsedBoxes[boxIndex].west = parseFloat(west);
-      parsedBoxes[boxIndex].south = parseFloat(south);
-      parsedBoxes[boxIndex].east = parseFloat(east);
-      parsedBoxes[boxIndex].north = parseFloat(north);
-      parsedBoxes[boxIndex].bounds = [[parsedBoxes[boxIndex].south, parsedBoxes[boxIndex].west], [parsedBoxes[boxIndex].north, parsedBoxes[boxIndex].east]];
+      parsedBoxes[boxIndex].west = west;
+      parsedBoxes[boxIndex].south = south;
+      parsedBoxes[boxIndex].east = east;
+      parsedBoxes[boxIndex].north = north;
+      parsedBoxes[boxIndex].bounds = [[south, west], [north, east]];
       
       // Get the current text and lines
       const text = textarea.value;
@@ -556,6 +623,31 @@
       
       // Update syntax highlighting
       updateHighlighting();
+      
+      // Update the actual rectangle bounds to match the rounded coordinates
+      rectangle.setBounds([[south, west], [north, east]]);
+      
+      // Update the marker positions to match the new bounds
+      if (rectangle.cornerMarkers) {
+        updateMarkerPositions(rectangle, rectangle.cornerMarkers);
+      }
+    }
+    
+    // Update marker positions when the rectangle changes
+    function updateMarkerPositions(rectangle, markers) {
+      const bounds = rectangle.getBounds();
+      
+      markers.forEach(marker => {
+        if (marker.corner === 'nw') {
+          marker.setLatLng(bounds.getNorthWest());
+        } else if (marker.corner === 'ne') {
+          marker.setLatLng(bounds.getNorthEast());
+        } else if (marker.corner === 'sw') {
+          marker.setLatLng(bounds.getSouthWest());
+        } else if (marker.corner === 'se') {
+          marker.setLatLng(bounds.getSouthEast());
+        }
+      });
     }
     
     // Create custom corner handles for a rectangle
@@ -645,19 +737,27 @@
         let east = bounds.getEast();
         let west = bounds.getWest();
         
+        // Get the marker's current position
+        const lat = marker.getLatLng().lat;
+        const lng = marker.getLatLng().lng;
+        
+        // Round the coordinates to the current precision
+        const roundedLat = roundToPrecision(lat, coordinatePrecision);
+        const roundedLng = roundToPrecision(lng, coordinatePrecision);
+        
         // Update the appropriate corner coordinates
         if (corner === 'nw') {
-          north = marker.getLatLng().lat;
-          west = marker.getLatLng().lng;
+          north = roundedLat;
+          west = roundedLng;
         } else if (corner === 'ne') {
-          north = marker.getLatLng().lat;
-          east = marker.getLatLng().lng;
+          north = roundedLat;
+          east = roundedLng;
         } else if (corner === 'sw') {
-          south = marker.getLatLng().lat;
-          west = marker.getLatLng().lng;
+          south = roundedLat;
+          west = roundedLng;
         } else if (corner === 'se') {
-          south = marker.getLatLng().lat;
-          east = marker.getLatLng().lng;
+          south = roundedLat;
+          east = roundedLng;
         }
         
         // Create new bounds
@@ -675,23 +775,6 @@
       
       function onMarkerDragEnd(e) {
         updateBoxCoordinates(e.target.rectangle);
-      }
-      
-      // Update marker positions when the rectangle changes
-      function updateMarkerPositions(rectangle, markers) {
-        const bounds = rectangle.getBounds();
-        
-        markers.forEach(marker => {
-          if (marker.corner === 'nw') {
-            marker.setLatLng(bounds.getNorthWest());
-          } else if (marker.corner === 'ne') {
-            marker.setLatLng(bounds.getNorthEast());
-          } else if (marker.corner === 'sw') {
-            marker.setLatLng(bounds.getSouthWest());
-          } else if (marker.corner === 'se') {
-            marker.setLatLng(bounds.getSouthEast());
-          }
-        });
       }
       
       // Add event listeners
@@ -770,10 +853,24 @@
       processInput();
     }
     
+    // Handle precision change
+    function handlePrecisionChange() {
+      // Get the new precision value
+      coordinatePrecision = parseInt(precisionSelect.value);
+      
+      // Update all boxes with the new precision
+      boxLayers.forEach(rectangle => {
+        updateBoxCoordinates(rectangle);
+      });
+    }
+    
     // Initialize everything
     function init() {
       // Set default text
       textarea.value = defaultData;
+      
+      // Set up precision selector
+      precisionSelect.addEventListener('change', handlePrecisionChange);
       
       // Initialize the map
       initMap();
