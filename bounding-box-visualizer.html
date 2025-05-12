@@ -367,7 +367,14 @@
             <option value="3">3 decimals</option>
             <option value="4">4 decimals</option>
             <option value="5">5 decimals</option>
-            <option value="6" selected>6 decimals</option>
+            <option value="6">6 decimals</option>
+            <option value="7">7 decimals</option>
+            <option value="8">8 decimals</option>
+            <option value="9">9 decimals</option>
+            <option value="10">10 decimals</option>
+            <option value="11">11 decimals</option>
+            <option value="12">12 decimals</option>
+            <option value="13" selected>13 decimals</option>
           </select>
         </div>
       </div>
@@ -403,7 +410,7 @@
     let boxLayers = [];
     let parsedBoxes = [];
     let editableLayers;
-    let coordinatePrecision = 6; // Default precision (decimal places)
+    let coordinatePrecision = 13; // Default precision (decimal places)
 
     // Colors for bounding boxes
     const colors = [
@@ -584,6 +591,12 @@
       const east = roundToPrecision(bounds.getEast(), coordinatePrecision);
       const north = roundToPrecision(bounds.getNorth(), coordinatePrecision);
 
+      // Strip off trailing zeros
+      const westStr = west.toFixed(coordinatePrecision).replace(/\.?0+$/, '');
+      const southStr = south.toFixed(coordinatePrecision).replace(/\.?0+$/, '');
+      const eastStr = east.toFixed(coordinatePrecision).replace(/\.?0+$/, '');
+      const northStr = north.toFixed(coordinatePrecision).replace(/\.?0+$/, '');
+
       // Find the box index by checking the boxIndex property
       let boxIndex = -1;
       if (rectangle.boxIndex !== undefined) {
@@ -612,13 +625,7 @@
       }
 
       // Format the new coordinates string based on precision
-      let newCoordinates;
-      if (coordinatePrecision === 0) {
-        // No decimal places
-        newCoordinates = `[${west.toFixed(0)}, ${south.toFixed(0)}, ${east.toFixed(0)}, ${north.toFixed(0)}]`;
-      } else {
-        newCoordinates = `[${west.toFixed(coordinatePrecision)}, ${south.toFixed(coordinatePrecision)}, ${east.toFixed(coordinatePrecision)}, ${north.toFixed(coordinatePrecision)}]`;
-      }
+      const newCoordinates = `[${westStr}, ${southStr}, ${eastStr}, ${northStr}]`;
 
       // Update the box object
       parsedBoxes[boxIndex].west = west;
@@ -643,6 +650,13 @@
 
       // Join back the lines and update the textarea
       textarea.value = lines.join('\n');
+
+      // Save to localStorage
+      try {
+        localStorage.setItem('boundingBoxMapContent', textarea.value);
+      } catch (e) {
+        console.warn('Failed to save to localStorage:', e);
+      }
 
       // Update syntax highlighting
       updateHighlighting();
@@ -899,6 +913,13 @@
 
     // Handle manual edits in the text input
     function handleTextareaInput() {
+      // Save content to localStorage
+      try {
+        localStorage.setItem('boundingBoxMapContent', textarea.value);
+      } catch (e) {
+        console.warn('Failed to save to localStorage:', e);
+      }
+
       processInput();
     }
 
@@ -906,6 +927,13 @@
     function handlePrecisionChange() {
       // Get the new precision value
       coordinatePrecision = parseInt(precisionSelect.value);
+
+      // Save precision to localStorage
+      try {
+        localStorage.setItem('boundingBoxMapPrecision', coordinatePrecision.toString());
+      } catch (e) {
+        console.warn('Failed to save precision to localStorage:', e);
+      }
 
       // Update all boxes with the new precision
       boxLayers.forEach(rectangle => {
@@ -915,8 +943,28 @@
 
     // Initialize everything
     function init() {
-      // Set default text
-      textarea.value = defaultData;
+      // Try to load saved content from localStorage
+      try {
+        const savedContent = localStorage.getItem('boundingBoxMapContent');
+        if (savedContent) {
+          // Use saved content if available
+          textarea.value = savedContent;
+        } else {
+          // Otherwise use default text
+          textarea.value = defaultData;
+        }
+
+        // Load saved precision setting
+        const savedPrecision = localStorage.getItem('boundingBoxMapPrecision');
+        if (savedPrecision !== null) {
+          coordinatePrecision = parseInt(savedPrecision);
+          precisionSelect.value = savedPrecision;
+        }
+      } catch (e) {
+        console.warn('Failed to load from localStorage:', e);
+        // Fall back to default data
+        textarea.value = defaultData;
+      }
 
       // Set up precision selector
       precisionSelect.addEventListener('change', handlePrecisionChange);
