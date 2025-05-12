@@ -3,10 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bounding Box Map Visualizer</title>
+  <title>Interactive Bounding Box Map Visualizer</title>
   
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+  
+  <!-- Leaflet.Draw CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
   
   <style>
     * {
@@ -175,18 +178,124 @@
     .line-bounding-box {
       font-weight: bold;
     }
+    
+    /* Hide the default Leaflet.Draw toolbar */
+    .leaflet-draw.leaflet-control {
+      display: none;
+    }
+    
+    /* Hide tooltips */
+    .leaflet-draw-tooltip {
+      display: none !important;
+    }
+    
+    /* Hide all middle markers - these are the ones on the sides of the rectangle */
+    .leaflet-edit-marker-middle,
+    .leaflet-edit-marker.leaflet-edit-marker-middle,
+    .leaflet-editing-icon.leaflet-edit-marker-middle,
+    .leaflet-marker-draggable.leaflet-edit-marker-middle,
+    [class*="-marker-middle"] {
+      display: none !important;
+    }
+    
+    /* Hide any unwanted center markers */
+    .leaflet-marker-icon:not(.corner-handle) {
+      display: none !important;
+    }
+    
+    /* Basic style for corner handles */
+    .corner-handle {
+      width: 20px !important;
+      height: 20px !important;
+      margin-left: -10px !important;
+      margin-top: -10px !important;
+      background-color: transparent !important;
+      border: none !important;
+      position: absolute !important;
+      cursor: nwse-resize !important;
+      z-index: 1000 !important;
+    }
+    
+    /* L-shaped corner handle styles */
+    .corner-handle::before,
+    .corner-handle::after {
+      content: '';
+      position: absolute;
+      background-color: black;
+      display: block;
+    }
+    
+    /* Top-left corner (⌜) */
+    .corner-tl::before {
+      top: -2px;
+      left: -2px;
+      width: 10px;
+      height: 2px;
+    }
+    
+    .corner-tl::after {
+      top: -2px;
+      left: -2px;
+      width: 2px;
+      height: 10px;
+    }
+    
+    /* Top-right corner (⌝) */
+    .corner-tr::before {
+      top: -2px;
+      right: -2px;
+      width: 10px;
+      height: 2px;
+    }
+    
+    .corner-tr::after {
+      top: -2px;
+      right: -2px;
+      width: 2px;
+      height: 10px;
+    }
+    
+    /* Bottom-left corner (⌞) */
+    .corner-bl::before {
+      bottom: -2px;
+      left: -2px;
+      width: 10px;
+      height: 2px;
+    }
+    
+    .corner-bl::after {
+      bottom: -2px;
+      left: -2px;
+      width: 2px;
+      height: 10px;
+    }
+    
+    /* Bottom-right corner (⌟) */
+    .corner-br::before {
+      bottom: -2px;
+      right: -2px;
+      width: 10px;
+      height: 2px;
+    }
+    
+    .corner-br::after {
+      bottom: -2px;
+      right: -2px;
+      width: 2px;
+      height: 10px;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <h1 class="title">Bounding Box Map Visualizer</h1>
-      <p class="description">Enter bounding boxes in the format: [west_lon, south_lat, east_lon, north_lat]</p>
+      <h1 class="title">Interactive Bounding Box Map Visualizer</h1>
+      <p class="description">Enter bounding boxes in the format: [west_lon, south_lat, east_lon, north_lat] - click and drag corners to resize.</p>
       
       <div class="map-controls">
-        <button class="map-button" data-layer="googleStreets">Streets</button>
-        <button class="map-button" data-layer="googleTerrain">Terrain</button>
-        <button class="map-button active" data-layer="googleHybrid">Hybrid</button>
+        <button class="map-button" data-layer="streets">Streets</button>
+        <button class="map-button" data-layer="terrain">Terrain</button>
+        <button class="map-button active" data-layer="hybrid">Hybrid</button>
       </div>
     </div>
     
@@ -210,12 +319,16 @@
   <!-- Leaflet JS -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
   
+  <!-- Leaflet.Draw JS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+  
   <script>
     // Main variables
     let map;
-    let currentLayer = 'googleHybrid';
+    let currentLayer = 'hybrid';
     let boxLayers = [];
     let parsedBoxes = [];
+    let editableLayers;
     
     // Colors for bounding boxes
     const colors = [
@@ -247,18 +360,18 @@
       
       // Define base layers
       const baseLayers = {
-        googleStreets: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 20,
+        streets: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
           subdomains: ['a', 'b', 'c'],
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }),
-        googleTerrain: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 20,
+        terrain: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
           subdomains: ['a', 'b', 'c'],
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }),
-        googleHybrid: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 20,
+        hybrid: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
           subdomains: ['a', 'b', 'c'],
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         })
@@ -266,6 +379,10 @@
       
       // Add the default base layer
       baseLayers[currentLayer].addTo(map);
+      
+      // Initialize editable layer group
+      editableLayers = new L.FeatureGroup();
+      map.addLayer(editableLayers);
       
       // Add layer switch functionality to buttons
       mapButtons.forEach(button => {
@@ -285,6 +402,13 @@
           
           currentLayer = layerName;
           baseLayers[currentLayer].addTo(map);
+        });
+      });
+      
+      // Add map mouseup handler to catch all changes
+      map.on('mouseup', function() {
+        boxLayers.forEach(box => {
+          updateBoxCoordinates(box);
         });
       });
     }
@@ -312,7 +436,9 @@
               boxes.push({
                 bounds: [[south, west], [north, east]],
                 color: colors[boxes.length % colors.length],
-                index
+                index,
+                line: line,
+                west, south, east, north
               });
             }
           }
@@ -355,27 +481,259 @@
       });
     }
     
+    // Update the text in the textarea when a box is transformed
+    function updateBoxCoordinates(rectangle) {
+      // Find associated parsed box by comparing bounds
+      const bounds = rectangle.getBounds();
+      const west = bounds.getWest().toFixed(6);
+      const south = bounds.getSouth().toFixed(6);
+      const east = bounds.getEast().toFixed(6);
+      const north = bounds.getNorth().toFixed(6);
+      
+      // Find the box index by checking the boxIndex property
+      let boxIndex = -1;
+      if (rectangle.boxIndex !== undefined) {
+        boxIndex = rectangle.boxIndex;
+      } else {
+        // Find the closest box if boxIndex is not set
+        let minDistance = Infinity;
+        parsedBoxes.forEach((box, idx) => {
+          const boxCenter = [(box.north + box.south) / 2, (box.east + box.west) / 2];
+          const rectCenter = [(parseFloat(north) + parseFloat(south)) / 2, (parseFloat(east) + parseFloat(west)) / 2];
+          
+          const distance = Math.sqrt(
+            Math.pow(boxCenter[0] - rectCenter[0], 2) + 
+            Math.pow(boxCenter[1] - rectCenter[1], 2)
+          );
+          
+          if (distance < minDistance) {
+            minDistance = distance;
+            boxIndex = idx;
+          }
+        });
+      }
+      
+      if (boxIndex === -1 || boxIndex >= parsedBoxes.length) {
+        return;
+      }
+      
+      // Format the new coordinates string
+      const newCoordinates = `[${west}, ${south}, ${east}, ${north}]`;
+      
+      // Update the box object
+      parsedBoxes[boxIndex].west = parseFloat(west);
+      parsedBoxes[boxIndex].south = parseFloat(south);
+      parsedBoxes[boxIndex].east = parseFloat(east);
+      parsedBoxes[boxIndex].north = parseFloat(north);
+      parsedBoxes[boxIndex].bounds = [[parsedBoxes[boxIndex].south, parsedBoxes[boxIndex].west], [parsedBoxes[boxIndex].north, parsedBoxes[boxIndex].east]];
+      
+      // Get the current text and lines
+      const text = textarea.value;
+      const lines = text.split('\n');
+      
+      // Replace the old coordinates in the line
+      const oldLine = lines[parsedBoxes[boxIndex].index];
+      const newLine = oldLine.replace(/\[[-\d.,\s]+\]/, newCoordinates);
+      
+      // Update the line in the array
+      lines[parsedBoxes[boxIndex].index] = newLine;
+      
+      // Update the box's line property
+      parsedBoxes[boxIndex].line = newLine;
+      
+      // Join back the lines and update the textarea
+      textarea.value = lines.join('\n');
+      
+      // Update syntax highlighting
+      updateHighlighting();
+    }
+    
+    // Create custom corner handles for a rectangle
+    function createCustomCornerHandles(rectangle) {
+      // Get the LatLngBounds object
+      const bounds = rectangle.getBounds();
+      
+      // Get corner coordinates
+      const northWest = bounds.getNorthWest();
+      const northEast = bounds.getNorthEast();
+      const southWest = bounds.getSouthWest();
+      const southEast = bounds.getSouthEast();
+      
+      // Define marker options
+      const markerOptions = {
+        draggable: true,
+        icon: L.divIcon({
+          className: 'corner-handle',
+          iconSize: [20, 20]
+        })
+      };
+      
+      // Create markers for each corner
+      const nwMarker = L.marker(northWest, markerOptions);
+      const neMarker = L.marker(northEast, markerOptions);
+      const swMarker = L.marker(southWest, markerOptions);
+      const seMarker = L.marker(southEast, markerOptions);
+      
+      // Add markers to map
+      nwMarker.addTo(map);
+      neMarker.addTo(map);
+      swMarker.addTo(map);
+      seMarker.addTo(map);
+      
+      // Store reference to rectangle
+      nwMarker.rectangle = rectangle;
+      neMarker.rectangle = rectangle;
+      swMarker.rectangle = rectangle;
+      seMarker.rectangle = rectangle;
+      
+      // Set corner positions
+      nwMarker.corner = 'nw';
+      neMarker.corner = 'ne';
+      swMarker.corner = 'sw';
+      seMarker.corner = 'se';
+      
+      // Style the marker elements
+      setTimeout(() => {
+        // Get the DOM elements
+        const nwEl = nwMarker.getElement();
+        const neEl = neMarker.getElement();
+        const swEl = swMarker.getElement();
+        const seEl = seMarker.getElement();
+        
+        // Add corner-specific classes
+        if (nwEl) {
+          nwEl.classList.add('corner-tl');
+          nwEl.style.cursor = 'nwse-resize';
+        }
+        
+        if (neEl) {
+          neEl.classList.add('corner-tr');
+          neEl.style.cursor = 'nesw-resize';
+        }
+        
+        if (swEl) {
+          swEl.classList.add('corner-bl');
+          swEl.style.cursor = 'nesw-resize';
+        }
+        
+        if (seEl) {
+          seEl.classList.add('corner-br');
+          seEl.style.cursor = 'nwse-resize';
+        }
+      }, 100);
+      
+      // Handle marker drag events
+      function onMarkerDrag(e) {
+        const marker = e.target;
+        const rectangle = marker.rectangle;
+        const corner = marker.corner;
+        const bounds = rectangle.getBounds();
+        
+        // Get the current bounds coordinates
+        let north = bounds.getNorth();
+        let south = bounds.getSouth();
+        let east = bounds.getEast();
+        let west = bounds.getWest();
+        
+        // Update the appropriate corner coordinates
+        if (corner === 'nw') {
+          north = marker.getLatLng().lat;
+          west = marker.getLatLng().lng;
+        } else if (corner === 'ne') {
+          north = marker.getLatLng().lat;
+          east = marker.getLatLng().lng;
+        } else if (corner === 'sw') {
+          south = marker.getLatLng().lat;
+          west = marker.getLatLng().lng;
+        } else if (corner === 'se') {
+          south = marker.getLatLng().lat;
+          east = marker.getLatLng().lng;
+        }
+        
+        // Create new bounds
+        const newBounds = L.latLngBounds([
+          [south, west],
+          [north, east]
+        ]);
+        
+        // Update rectangle geometry
+        rectangle.setBounds(newBounds);
+        
+        // Update other markers
+        updateMarkerPositions(rectangle, [nwMarker, neMarker, swMarker, seMarker]);
+      }
+      
+      function onMarkerDragEnd(e) {
+        updateBoxCoordinates(e.target.rectangle);
+      }
+      
+      // Update marker positions when the rectangle changes
+      function updateMarkerPositions(rectangle, markers) {
+        const bounds = rectangle.getBounds();
+        
+        markers.forEach(marker => {
+          if (marker.corner === 'nw') {
+            marker.setLatLng(bounds.getNorthWest());
+          } else if (marker.corner === 'ne') {
+            marker.setLatLng(bounds.getNorthEast());
+          } else if (marker.corner === 'sw') {
+            marker.setLatLng(bounds.getSouthWest());
+          } else if (marker.corner === 'se') {
+            marker.setLatLng(bounds.getSouthEast());
+          }
+        });
+      }
+      
+      // Add event listeners
+      nwMarker.on('drag', onMarkerDrag);
+      neMarker.on('drag', onMarkerDrag);
+      swMarker.on('drag', onMarkerDrag);
+      seMarker.on('drag', onMarkerDrag);
+      
+      nwMarker.on('dragend', onMarkerDragEnd);
+      neMarker.on('dragend', onMarkerDragEnd);
+      swMarker.on('dragend', onMarkerDragEnd);
+      seMarker.on('dragend', onMarkerDragEnd);
+      
+      // Store markers in rectangle for later reference
+      rectangle.cornerMarkers = [nwMarker, neMarker, swMarker, seMarker];
+    }
+    
     // Update the map with bounding boxes
     function updateMapBoxes() {
-      // Remove existing box layers
-      boxLayers.forEach(layer => {
-        if (map.hasLayer(layer)) {
-          map.removeLayer(layer);
+      // Clear existing editable layers
+      editableLayers.clearLayers();
+      
+      // Remove existing corner markers
+      boxLayers.forEach(rectangle => {
+        if (rectangle.cornerMarkers) {
+          rectangle.cornerMarkers.forEach(marker => {
+            if (map.hasLayer(marker)) {
+              map.removeLayer(marker);
+            }
+          });
         }
       });
       
       boxLayers = [];
       
       // Add new box layers
-      parsedBoxes.forEach(box => {
+      parsedBoxes.forEach((box, index) => {
         const rectangle = L.rectangle(box.bounds, {
           color: box.color,
-          weight: 3,
+          weight: 1, // Thin border
           fillOpacity: 0.2
         });
         
-        rectangle.addTo(map);
+        // Store the box index
+        rectangle.boxIndex = index;
+        
+        // Add to editable layers
+        editableLayers.addLayer(rectangle);
         boxLayers.push(rectangle);
+        
+        // Create custom corner handles for this rectangle
+        createCustomCornerHandles(rectangle);
       });
       
       // Update the box count display
@@ -397,6 +755,11 @@
       updateMapBoxes();
     }
     
+    // Handle manual edits in the text input
+    function handleTextareaInput() {
+      processInput();
+    }
+    
     // Initialize everything
     function init() {
       // Set default text
@@ -406,7 +769,7 @@
       initMap();
       
       // Set up the text input events
-      textarea.addEventListener('input', processInput);
+      textarea.addEventListener('input', handleTextareaInput);
       
       // Process initial input
       processInput();
@@ -415,6 +778,26 @@
       textarea.addEventListener('scroll', () => {
         highlightContainer.scrollTop = textarea.scrollTop;
         highlightContainer.scrollLeft = textarea.scrollLeft;
+      });
+      
+      // Add observer to update corner markers when panning or zooming
+      map.on('moveend', function() {
+        boxLayers.forEach(rectangle => {
+          if (rectangle.cornerMarkers) {
+            // Update marker positions
+            rectangle.cornerMarkers.forEach(marker => {
+              if (marker.corner === 'nw') {
+                marker.setLatLng(rectangle.getBounds().getNorthWest());
+              } else if (marker.corner === 'ne') {
+                marker.setLatLng(rectangle.getBounds().getNorthEast());
+              } else if (marker.corner === 'sw') {
+                marker.setLatLng(rectangle.getBounds().getSouthWest());
+              } else if (marker.corner === 'se') {
+                marker.setLatLng(rectangle.getBounds().getSouthEast());
+              }
+            });
+          }
+        });
       });
     }
     
