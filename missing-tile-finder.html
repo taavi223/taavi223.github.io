@@ -94,26 +94,6 @@
             color: #555;
         }
 
-        .missing-tile {
-            background-color: rgba(255, 0, 0, 0.3);
-            border: 1px solid red;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-        }
-
-        .found-tile {
-            background-color: rgba(0, 255, 0, 0.2);
-            border: 1px solid green;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-        }
-
         .legend {
             padding: 6px 8px;
             background: white;
@@ -193,8 +173,8 @@
         const legend = L.control({ position: 'bottomright' });
         legend.onAdd = function (map) {
             const div = L.DomUtil.create('div', 'legend');
-            div.innerHTML = '<span style="background: rgba(255, 0, 0, 0.3)"></span> Missing Tiles<br>' +
-                '<span style="background: rgba(0, 255, 0, 0.2)"></span> Found Tiles';
+            div.innerHTML = '<span style="background: rgba(255, 0, 0, 0.5)"></span> Missing Tiles<br>' +
+                '<span style="background: rgba(0, 128, 0, 0.5)"></span> Found Tiles';
             return div;
         };
         legend.addTo(map);
@@ -385,24 +365,6 @@
             abortController = null;
             checkBtn.textContent = "Check Missing Tiles";
             // Keep progress bar visible to show the final result
-        }
-
-        function displayTile(tile, zoom, exists) {
-            // Convert tile coordinates to latlng bounds
-            const bounds = tileToLatLngBounds(tile.x, tile.y, zoom);
-
-            // Create a rectangle for the tile
-            const rectangle = L.rectangle(bounds, {
-                color: exists ? 'green' : 'red',
-                weight: 1,
-                fillColor: exists ? 'green' : 'red',
-                fillOpacity: exists ? 0.2 : 0.3,
-                className: exists ? 'found-tile' : 'missing-tile'
-            }).addTo(tilesLayer);
-
-            // Add a popup with tile coordinates
-            const status = exists ? 'Found' : 'Missing';
-            rectangle.bindPopup(`${status} Tile: ${zoom}/${tile.x}/${tile.y}`);
         }
 
         async function checkTiles() {
@@ -778,9 +740,9 @@
             // Create a rectangle for the tile block
             const rectangle = L.rectangle(bounds, {
                 color: exists ? 'green' : 'red',
-                weight: 1,
+                weight: 0,
                 fillColor: exists ? 'green' : 'red',
-                fillOpacity: exists ? 0.2 : 0.3,
+                fillOpacity: 0.5,
                 className: exists ? 'found-tile' : 'missing-tile'
             }).addTo(targetLayer);
 
