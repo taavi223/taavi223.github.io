@@ -686,6 +686,7 @@
     let currentProjection = ''; // Default to auto-detect
     let customLayers = []; // Store custom layer definitions
     let baseLayers = {}; // Define base layers object
+    let streetsBackupLayer; // Backup streets layer for transparent tiles
 
     // Define projection definitions
     proj4.defs('EPSG:4326', '+proj=longlat +datum=WGS84 +no_defs +type=crs');
@@ -897,12 +898,26 @@ srs: 'EPSG:4326'`;
           }
         )
       };
+      
+      // Define a fallback streets layer to use as backup - make it a global variable
+      streetsBackupLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        subdomains: ['a', 'b', 'c'],
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        opacity: 0.5,
+        zIndex: 0 // Keep the backup layer below other layers
+      });
 
       // Load custom layers before adding the default base layer
       loadCustomLayers();
 
       // Add the default base layer - with fallback if the saved layer doesn't exist
       if (baseLayers[currentLayer]) {
+        // If using a layer other than streets, add the streets backup first
+        if (currentLayer !== 'streets') {
+          streetsBackupLayer.addTo(map);
+        }
+        
         baseLayers[currentLayer].addTo(map);
       } else {
         // Fallback to streets layer if the saved layer doesn't exist
@@ -925,13 +940,30 @@ srs: 'EPSG:4326'`;
           // Update button states
           updateActiveLayerButton();
 
-          // Remove current layer and add the selected one
-          if (map.hasLayer(baseLayers[currentLayer])) {
-            map.removeLayer(baseLayers[currentLayer]);
+          // Debug what's happening
+          console.log("Switching to layer:", layerName);
+          console.log("Layer exists:", !!baseLayers[layerName]);
+          console.log("All available layers:", Object.keys(baseLayers));
+          
+          // Remove all base layers
+          Object.keys(baseLayers).forEach(key => {
+            if (map.hasLayer(baseLayers[key])) {
+              map.removeLayer(baseLayers[key]);
+            }
+          });
+          
+          // Remove backup layer if it exists
+          if (map.hasLayer(streetsBackupLayer)) {
+            map.removeLayer(streetsBackupLayer);
           }
           
           // Set the new current layer
           currentLayer = layerName;
+          
+          // For any layer other than streets, add the streets backup first
+          if (currentLayer !== 'streets' && baseLayers[currentLayer]) {
+            streetsBackupLayer.addTo(map);
+          }
           
           // Verify the layer exists and add it
           if (baseLayers[currentLayer]) {
@@ -1729,9 +1761,26 @@ srs: 'EPSG:4326'`;
         // Update button states
         updateActiveLayerButton();
 
-        // Remove current layer and add the selected one
-        if (map.hasLayer(baseLayers[currentLayer])) {
-          map.removeLayer(baseLayers[currentLayer]);
+        // Debug what's happening
+        console.log("Switching to layer:", currentLayer);
+        console.log("Layer exists:", !!baseLayers[currentLayer]);
+        console.log("All available layers:", Object.keys(baseLayers));
+
+        // Remove current layer and any backup layer
+        Object.keys(baseLayers).forEach(key => {
+          if (map.hasLayer(baseLayers[key])) {
+            map.removeLayer(baseLayers[key]);
+          }
+        });
+        
+        // Remove backup layer if it exists
+        if (map.hasLayer(streetsBackupLayer)) {
+          map.removeLayer(streetsBackupLayer);
+        }
+          
+        // For any layer other than streets, add the streets backup first
+        if (currentLayer !== 'streets' && baseLayers[currentLayer]) {
+          streetsBackupLayer.addTo(map);
         }
           
         // Verify the layer exists and add it
@@ -1882,13 +1931,32 @@ srs: 'EPSG:4326'`;
 
         // Switch to the new layer
         if (baseLayers[layerId]) {
-          // Remove current layer
-          if (map.hasLayer(baseLayers[currentLayer])) {
-            map.removeLayer(baseLayers[currentLayer]);
+          // Debug what's happening
+          console.log("Adding new layer:", layerId);
+          console.log("Layer exists:", !!baseLayers[layerId]);
+          console.log("All available layers:", Object.keys(baseLayers));
+          
+          // Remove all base layers
+          Object.keys(baseLayers).forEach(key => {
+            if (map.hasLayer(baseLayers[key])) {
+              map.removeLayer(baseLayers[key]);
+            }
+          });
+          
+          // Remove backup layer if it exists
+          if (map.hasLayer(streetsBackupLayer)) {
+            map.removeLayer(streetsBackupLayer);
           }
           
-          // Set new layer as current and add to map
+          // Set new layer as current
           currentLayer = layerId;
+          
+          // For any layer other than streets, add the streets backup first
+          if (currentLayer !== 'streets') {
+            streetsBackupLayer.addTo(map);
+          }
+          
+          // Add the selected layer to map
           baseLayers[currentLayer].addTo(map);
           
           // Update button states
