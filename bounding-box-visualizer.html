@@ -71,18 +71,21 @@
       gap: 0.5rem;
     }
 
-    .precision-controls, .projection-controls {
+    .precision-controls,
+    .projection-controls {
       display: flex;
       align-items: center;
       gap: 0.5rem;
     }
 
-    .precision-label, .projection-label {
+    .precision-label,
+    .projection-label {
       font-size: 0.875rem;
       color: #4b5563;
     }
 
-    .precision-select, .projection-select {
+    .precision-select,
+    .projection-select {
       padding: 0.25rem;
       border-radius: 0.25rem;
       border: 1px solid #d1d5db;
@@ -353,10 +356,241 @@
       margin-top: 0.25rem;
       font-style: italic;
     }
+
+    /* Custom Layer Dialog */
+    .custom-layer-button {
+      margin-left: auto;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.25rem;
+      border: 1px solid #d1d5db;
+      background-color: white;
+      font-size: 0.875rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .custom-layer-button svg {
+      width: 1rem;
+      height: 1rem;
+    }
+
+    .dialog-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      visibility: hidden;
+      opacity: 0;
+      transition: visibility 0s linear 0.25s, opacity 0.25s linear;
+    }
+
+    .dialog-backdrop.visible {
+      visibility: visible;
+      opacity: 1;
+      transition-delay: 0s;
+    }
+
+    .dialog {
+      background-color: white;
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      min-width: 320px;
+      max-width: 90%;
+      max-height: 90%;
+      overflow: auto;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .dialog-title {
+      font-size: 1.25rem;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+    }
+
+    .dialog-content {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .form-label {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: #374151;
+    }
+
+    .form-input {
+      padding: 0.5rem;
+      border-radius: 0.25rem;
+      border: 1px solid #d1d5db;
+      font-size: 0.875rem;
+    }
+
+    .form-hint {
+      font-size: 0.75rem;
+      color: #6b7280;
+    }
+
+    .form-buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+
+    .button {
+      padding: 0.5rem 1rem;
+      border-radius: 0.25rem;
+      border: none;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+
+    .button-secondary {
+      background-color: #e5e7eb;
+      color: #1f2937;
+    }
+
+    .button-primary {
+      background-color: #3b82f6;
+      color: white;
+    }
+
+    .custom-layers-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-top: 1rem;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .custom-layer-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem;
+      border-radius: 0.25rem;
+      background-color: #f3f4f6;
+    }
+
+    .custom-layer-info {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .custom-layer-name {
+      font-weight: 500;
+      font-size: 0.875rem;
+    }
+
+    .custom-layer-url {
+      font-size: 0.75rem;
+      color: #6b7280;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    .custom-layer-actions {
+      display: flex;
+      gap: 0.25rem;
+    }
+
+    .action-button {
+      padding: 0.25rem;
+      border-radius: 0.25rem;
+      border: none;
+      background-color: transparent;
+      cursor: pointer;
+      color: #6b7280;
+    }
+
+    .action-button:hover {
+      background-color: #e5e7eb;
+      color: #1f2937;
+    }
+
+    .action-button svg {
+      width: 1rem;
+      height: 1rem;
+    }
+
+    .custom-layer-message {
+      font-size: 0.875rem;
+      color: #6b7280;
+      text-align: center;
+      padding: 1rem;
+    }
+
+    .error-message {
+      color: #dc2626;
+      font-size: 0.75rem;
+      margin-top: 0.25rem;
+    }
   </style>
 </head>
 
 <body>
+
+  <div id="custom-layer-dialog" class="dialog-backdrop">
+    <div class="dialog">
+      <h2 class="dialog-title">Custom Tile Maps</h2>
+      <div class="dialog-content">
+        <form id="custom-layer-form">
+          <div class="form-group">
+            <label class="form-label" for="layer-name">Map Name</label>
+            <input type="text" id="layer-name" class="form-input" placeholder="e.g. My Custom Map" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="layer-url">Tile URL</label>
+            <input type="text" id="layer-url" class="form-input"
+              placeholder="e.g. https://{s}.tile.server.org/{z}/{x}/{y}.png" required>
+            <div class="form-hint">
+              Use {x}, {y}, {z} placeholders for tile coordinates. Supports both web URLs and file:// URLs.
+            </div>
+            <div id="url-error" class="error-message" style="display: none;"></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="layer-attribution">Attribution (optional)</label>
+            <input type="text" id="layer-attribution" class="form-input"
+              placeholder="e.g. © OpenStreetMap contributors">
+          </div>
+          <div class="form-buttons">
+            <button type="button" class="button button-secondary" id="cancel-layer-button">Cancel</button>
+            <button type="submit" class="button button-primary" id="add-layer-button">Add Map</button>
+          </div>
+        </form>
+
+        <div id="custom-layers-container">
+          <h3 style="font-size: 1rem; margin-top: 1rem;">Saved Maps</h3>
+          <div id="custom-layers-list" class="custom-layers-list">
+            <div class="custom-layer-message">No custom maps added yet.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
   <div class="container">
     <div class="header">
       <h1 class="title">Interactive Bounding Box Map Visualizer</h1>
@@ -368,6 +602,13 @@
           <button class="map-button active" data-layer="streets">Streets</button>
           <button class="map-button" data-layer="terrain">Terrain</button>
           <button class="map-button" data-layer="hybrid">Hybrid</button>
+          <button class="custom-layer-button" id="custom-layer-button">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 5v14M5 12h14"></path>
+            </svg>
+            Custom Maps
+          </button>
         </div>
 
         <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
@@ -381,7 +622,7 @@
               <option value="EPSG:3785">EPSG:3785 (Web Mercator)</option>
             </select>
           </div>
-          
+
           <div class="precision-controls">
             <label class="precision-label" for="precision-select">Coordinate Precision:</label>
             <select class="precision-select" id="precision-select">
@@ -443,6 +684,8 @@
     let editableLayers;
     let coordinatePrecision = 13; // Default precision (decimal places)
     let currentProjection = ''; // Default to auto-detect
+    let customLayers = []; // Store custom layer definitions
+    let baseLayers = {}; // Define base layers object
 
     // Define projection definitions
     proj4.defs('EPSG:4326', '+proj=longlat +datum=WGS84 +no_defs +type=crs');
@@ -504,7 +747,7 @@ srs: 'EPSG:4326'`;
 
       // Convert southwest corner
       const [westConverted, southConverted] = proj4(fromProj, toProj, [west, south]);
-      
+
       // Convert northeast corner
       const [eastConverted, northConverted] = proj4(fromProj, toProj, [east, north]);
 
@@ -521,30 +764,30 @@ srs: 'EPSG:4326'`;
     function detectProjection(text) {
       const projectionRegex = /srs:\s*'(EPSG:\d+)'/g;
       const matches = [...text.matchAll(projectionRegex)];
-      
+
       if (matches.length > 0) {
         // Count occurrences of each projection
         const projectionCounts = {};
-        
+
         matches.forEach(match => {
           const proj = match[1];
           projectionCounts[proj] = (projectionCounts[proj] || 0) + 1;
         });
-        
+
         // Find the most common projection
         let mostCommonProj = '';
         let maxCount = 0;
-        
+
         for (const [proj, count] of Object.entries(projectionCounts)) {
           if (count > maxCount) {
             maxCount = count;
             mostCommonProj = proj;
           }
         }
-        
+
         return mostCommonProj;
       }
-      
+
       return '';
     }
 
@@ -562,10 +805,10 @@ srs: 'EPSG:4326'`;
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         const trimmedLine = line.trim();
-        
+
         // Check for bbox line
         const bboxMatch = trimmedLine.match(/bbox:\s*\[([-\d.]+),\s*([-\d.]+),\s*([-\d.]+),\s*([-\d.]+)\]/);
-        
+
         if (bboxMatch) {
           // Found a bbox line
           currentBox = {
@@ -576,58 +819,58 @@ srs: 'EPSG:4326'`;
             north: parseFloat(bboxMatch[4]),
             projection: fromProj // Assume the old projection by default
           };
-        } 
+        }
         else if (trimmedLine.match(/srs:\s*'EPSG:\d+'/) && currentBox && currentBox.lineIndex === i - 1) {
           // Found an SRS line right after a bbox line
           const srsMatch = trimmedLine.match(/srs:\s*'(EPSG:\d+)'/);
           if (srsMatch) {
             const lineProj = srsMatch[1];
-            
+
             // Only convert if the line projection matches the from projection
             if (lineProj === fromProj) {
               // Convert the coordinates
               const [westNew, southNew, eastNew, northNew] = convertCoordinates(
                 [currentBox.west, currentBox.south, currentBox.east, currentBox.north],
-                fromProj, 
+                fromProj,
                 toProj
               );
-              
+
               // Round the converted coordinates
               const roundedWest = roundToPrecision(westNew, coordinatePrecision);
               const roundedSouth = roundToPrecision(southNew, coordinatePrecision);
               const roundedEast = roundToPrecision(eastNew, coordinatePrecision);
               const roundedNorth = roundToPrecision(northNew, coordinatePrecision);
-              
+
               // Format without trailing zeros
               const westStr = roundedWest.toFixed(coordinatePrecision).replace(/\.?0+$/, '');
               const southStr = roundedSouth.toFixed(coordinatePrecision).replace(/\.?0+$/, '');
               const eastStr = roundedEast.toFixed(coordinatePrecision).replace(/\.?0+$/, '');
               const northStr = roundedNorth.toFixed(coordinatePrecision).replace(/\.?0+$/, '');
-              
+
               // Replace the bbox coordinates in the text
               const newBboxLine = lines[currentBox.lineIndex].replace(
-                /\[([-\d.]+),\s*([-\d.]+),\s*([-\d.]+),\s*([-\d.]+)\]/, 
+                /\[([-\d.]+),\s*([-\d.]+),\s*([-\d.]+),\s*([-\d.]+)\]/,
                 `[${westStr}, ${southStr}, ${eastStr}, ${northStr}]`
               );
-              
+
               // Update the line in our result
               result[currentBox.lineIndex] = newBboxLine;
-              
+
               // Replace the SRS string
               result[i] = line.replace(`'${fromProj}'`, `'${toProj}'`);
-              
+
               currentBox = null;
               continue;
             }
           }
         }
-        
+
         // Add line to result if not already added
         if (result.length <= i) {
           result.push(line);
         }
       }
-      
+
       return result.join('\n');
     }
 
@@ -736,16 +979,16 @@ srs: 'EPSG:4326'`;
             if (currentBox.projection !== 'EPSG:4326' && webMercatorCodes.includes(currentBox.projection)) {
               // Convert from Web Mercator to WGS84 for display
               const wgs84Coords = convertCoordinates(
-                [currentBox.west, currentBox.south, currentBox.east, currentBox.north], 
-                currentBox.projection, 
+                [currentBox.west, currentBox.south, currentBox.east, currentBox.north],
+                currentBox.projection,
                 'EPSG:4326'
               );
-              
+
               bounds = [[wgs84Coords[1], wgs84Coords[0]], [wgs84Coords[3], wgs84Coords[2]]];
             } else {
               bounds = [[currentBox.south, currentBox.west], [currentBox.north, currentBox.east]];
             }
-            
+
             currentBox.bounds = bounds;
 
             // Add the box to the list
@@ -758,24 +1001,24 @@ srs: 'EPSG:4326'`;
             } else {
               currentBox.projection = 'EPSG:4326'; // Fallback to WGS84
             }
-            
+
             // Calculate bounds
             let bounds;
             if (currentBox.projection !== 'EPSG:4326' && webMercatorCodes.includes(currentBox.projection)) {
               // Convert from Web Mercator to WGS84 for display
               const wgs84Coords = convertCoordinates(
-                [currentBox.west, currentBox.south, currentBox.east, currentBox.north], 
-                currentBox.projection, 
+                [currentBox.west, currentBox.south, currentBox.east, currentBox.north],
+                currentBox.projection,
                 'EPSG:4326'
               );
-              
+
               bounds = [[wgs84Coords[1], wgs84Coords[0]], [wgs84Coords[3], wgs84Coords[2]]];
             } else {
               bounds = [[currentBox.south, currentBox.west], [currentBox.north, currentBox.east]];
             }
-            
+
             currentBox.bounds = bounds;
-            
+
             boxes.push(currentBox);
             currentBox = null;
           }
@@ -791,24 +1034,24 @@ srs: 'EPSG:4326'`;
         } else {
           currentBox.projection = 'EPSG:4326'; // Fallback to WGS84
         }
-        
+
         // Calculate bounds
         let bounds;
         if (currentBox.projection !== 'EPSG:4326' && webMercatorCodes.includes(currentBox.projection)) {
           // Convert from Web Mercator to WGS84 for display
           const wgs84Coords = convertCoordinates(
-            [currentBox.west, currentBox.south, currentBox.east, currentBox.north], 
-            currentBox.projection, 
+            [currentBox.west, currentBox.south, currentBox.east, currentBox.north],
+            currentBox.projection,
             'EPSG:4326'
           );
-          
+
           bounds = [[wgs84Coords[1], wgs84Coords[0]], [wgs84Coords[3], wgs84Coords[2]]];
         } else {
           bounds = [[currentBox.south, currentBox.west], [currentBox.north, currentBox.east]];
         }
-        
+
         currentBox.bounds = bounds;
-        
+
         boxes.push(currentBox);
       }
 
@@ -897,11 +1140,11 @@ srs: 'EPSG:4326'`;
       if (boxProjection && boxProjection !== 'EPSG:4326' && webMercatorCodes.includes(boxProjection)) {
         // Convert from WGS84 to Web Mercator for storage
         const mercatorCoords = convertCoordinates(
-          [west, south, east, north], 
-          'EPSG:4326', 
+          [west, south, east, north],
+          'EPSG:4326',
           boxProjection
         );
-        
+
         west = mercatorCoords[0];
         south = mercatorCoords[1];
         east = mercatorCoords[2];
@@ -962,22 +1205,22 @@ srs: 'EPSG:4326'`;
       if (boxProjection && boxProjection !== 'EPSG:4326' && webMercatorCodes.includes(boxProjection)) {
         // Convert from Web Mercator to WGS84 for display
         const wgs84Coords = convertCoordinates(
-          [roundedWest, roundedSouth, roundedEast, roundedNorth], 
-          boxProjection, 
+          [roundedWest, roundedSouth, roundedEast, roundedNorth],
+          boxProjection,
           'EPSG:4326'
         );
-        
+
         displayBounds = L.latLngBounds([
-          [wgs84Coords[1], wgs84Coords[0]], 
+          [wgs84Coords[1], wgs84Coords[0]],
           [wgs84Coords[3], wgs84Coords[2]]
         ]);
       } else {
         displayBounds = L.latLngBounds([
-          [roundedSouth, roundedWest], 
+          [roundedSouth, roundedWest],
           [roundedNorth, roundedEast]
         ]);
       }
-      
+
       rectangle.setBounds(displayBounds);
 
       // Update the white border if it exists
@@ -1224,7 +1467,7 @@ srs: 'EPSG:4326'`;
     // Process input and update everything
     function processInput() {
       const inputText = textarea.value;
-      
+
       // Auto-detect projection if not set
       if (!currentProjection) {
         const detectedProjection = detectProjection(inputText);
@@ -1234,7 +1477,7 @@ srs: 'EPSG:4326'`;
           updateFormatExample(detectedProjection);
         }
       }
-      
+
       parsedBoxes = parseInput(inputText);
 
       updateHighlighting();
@@ -1275,7 +1518,7 @@ srs: 'EPSG:4326'`;
     function handleProjectionChange() {
       const newProjection = projectionSelect.value;
       const oldProjection = currentProjection;
-      
+
       // If auto-detect is selected, try to detect projection
       if (!newProjection) {
         const detectedProjection = detectProjection(textarea.value);
@@ -1289,22 +1532,22 @@ srs: 'EPSG:4326'`;
         }
         return;
       }
-      
+
       // Save the projection to localStorage
       try {
         localStorage.setItem('boundingBoxMapProjection', newProjection);
       } catch (e) {
         console.warn('Failed to save projection to localStorage:', e);
       }
-      
+
       // Convert coordinates and replace projection in the text
       if (oldProjection && oldProjection !== newProjection) {
         textarea.value = convertTextCoordinates(textarea.value, oldProjection, newProjection);
       }
-      
+
       currentProjection = newProjection;
       updateFormatExample(newProjection);
-      
+
       // Re-process the input with the new projection
       processInput();
     }
@@ -1321,11 +1564,297 @@ srs: 'EPSG:4326'`;
             updateFormatExample(detectedProjection);
           }
         }
-        
+
         processInput();
       }, 0);
     }
 
+    // Custom layers functions
+    function loadCustomLayers() {
+      try {
+        const savedLayers = localStorage.getItem('boundingBoxMapCustomLayers');
+        if (savedLayers) {
+          customLayers = JSON.parse(savedLayers);
+
+          // Create Leaflet tile layers for each custom layer
+          customLayers.forEach(layer => {
+            const tileLayer = L.tileLayer(layer.url, {
+              attribution: layer.attribution || '',
+              maxZoom: 22
+            });
+
+            // Add to base layers
+            baseLayers[layer.id] = tileLayer;
+
+            // Create a button for this layer
+            createCustomLayerButton(layer);
+          });
+        }
+      } catch (e) {
+        console.warn('Failed to load custom layers from localStorage:', e);
+      }
+    }
+
+    function saveCustomLayers() {
+      try {
+        localStorage.setItem('boundingBoxMapCustomLayers', JSON.stringify(customLayers));
+      } catch (e) {
+        console.warn('Failed to save custom layers to localStorage:', e);
+      }
+    }
+
+    function addCustomLayer(name, url, attribution) {
+      // Create a unique ID for this layer
+      const id = 'custom_' + Date.now();
+
+      // Create the layer definition
+      const layer = {
+        id: id,
+        name: name,
+        url: url,
+        attribution: attribution || ''
+      };
+
+      // Add to custom layers array
+      customLayers.push(layer);
+
+      // Create Leaflet tile layer
+      const tileLayer = L.tileLayer(url, {
+        attribution: attribution || '',
+        maxZoom: 22
+      });
+
+      // Add to base layers
+      baseLayers[id] = tileLayer;
+
+      // Save to localStorage
+      saveCustomLayers();
+
+      // Create a button for this layer
+      createCustomLayerButton(layer);
+
+      // Update the custom layers list
+      updateCustomLayersList();
+
+      return id;
+    }
+
+    function removeCustomLayer(id) {
+      // Find the layer
+      const index = customLayers.findIndex(layer => layer.id === id);
+
+      if (index !== -1) {
+        // Remove from array
+        customLayers.splice(index, 1);
+
+        // Remove button
+        const button = document.querySelector(`.map-button[data-layer="${id}"]`);
+        if (button) {
+          button.remove();
+        }
+
+        // Check if this is the current layer
+        if (currentLayer === id) {
+          // Switch to streets
+          const streetsButton = document.querySelector('.map-button[data-layer="streets"]');
+          if (streetsButton) {
+            streetsButton.click();
+          } else {
+            currentLayer = 'streets';
+            if (map.hasLayer(baseLayers[id])) {
+              map.removeLayer(baseLayers[id]);
+            }
+            baseLayers['streets'].addTo(map);
+          }
+        }
+
+        // Remove from base layers
+        delete baseLayers[id];
+
+        // Save to localStorage
+        saveCustomLayers();
+
+        // Update the custom layers list
+        updateCustomLayersList();
+      }
+    }
+
+    function createCustomLayerButton(layer) {
+      // Get the map controls container
+      const mapControls = document.querySelector('.map-controls');
+
+      // Create button
+      const button = document.createElement('button');
+      button.className = 'map-button';
+      button.setAttribute('data-layer', layer.id);
+      button.textContent = layer.name;
+
+      // Add before the custom layer button
+      const customButton = document.getElementById('custom-layer-button');
+      mapControls.insertBefore(button, customButton);
+
+      // Add click event
+      button.addEventListener('click', function () {
+        const layerName = this.getAttribute('data-layer');
+
+        // Remove active class from all buttons
+        const allButtons = document.querySelectorAll('.map-button');
+        allButtons.forEach(btn => btn.classList.remove('active'));
+
+        // Add active class to clicked button
+        this.classList.add('active');
+
+        // Remove current layer and add the selected one
+        if (map.hasLayer(baseLayers[currentLayer])) {
+          map.removeLayer(baseLayers[currentLayer]);
+        }
+
+        currentLayer = layerName;
+        baseLayers[currentLayer].addTo(map);
+
+        // Save the current layer to localStorage
+        try {
+          localStorage.setItem('boundingBoxMapCurrentLayer', currentLayer);
+        } catch (e) {
+          console.warn('Failed to save current layer to localStorage:', e);
+        }
+      });
+    }
+
+    function updateCustomLayersList() {
+      const container = document.getElementById('custom-layers-list');
+      container.innerHTML = '';
+
+      if (customLayers.length === 0) {
+        const message = document.createElement('div');
+        message.className = 'custom-layer-message';
+        message.textContent = 'No custom maps added yet.';
+        container.appendChild(message);
+        return;
+      }
+
+      // Create item for each layer
+      customLayers.forEach(layer => {
+        const item = document.createElement('div');
+        item.className = 'custom-layer-item';
+
+        const info = document.createElement('div');
+        info.className = 'custom-layer-info';
+
+        const name = document.createElement('div');
+        name.className = 'custom-layer-name';
+        name.textContent = layer.name;
+
+        const url = document.createElement('div');
+        url.className = 'custom-layer-url';
+        url.title = layer.url;
+        url.textContent = layer.url;
+
+        info.appendChild(name);
+        info.appendChild(url);
+
+        const actions = document.createElement('div');
+        actions.className = 'custom-layer-actions';
+
+        const deleteButton = document.createElement('button');
+        deleteButton.className = 'action-button';
+        deleteButton.title = 'Delete layer';
+        deleteButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>';
+
+        deleteButton.addEventListener('click', function () {
+          removeCustomLayer(layer.id);
+        });
+
+        actions.appendChild(deleteButton);
+
+        item.appendChild(info);
+        item.appendChild(actions);
+
+        container.appendChild(item);
+      });
+    }
+
+    // Handle custom layer form
+    function initCustomLayerDialog() {
+      const dialog = document.getElementById('custom-layer-dialog');
+      const openButton = document.getElementById('custom-layer-button');
+      const cancelButton = document.getElementById('cancel-layer-button');
+      const form = document.getElementById('custom-layer-form');
+
+      // Open dialog
+      openButton.addEventListener('click', function () {
+        dialog.classList.add('visible');
+        updateCustomLayersList();
+      });
+
+      // Close dialog
+      cancelButton.addEventListener('click', function () {
+        dialog.classList.remove('visible');
+        form.reset();
+      });
+
+      // Click outside to close
+      dialog.addEventListener('click', function (e) {
+        if (e.target === dialog) {
+          dialog.classList.remove('visible');
+          form.reset();
+        }
+      });
+
+      // Handle form submission
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+
+        // Get form values
+        const name = document.getElementById('layer-name').value;
+        const url = document.getElementById('layer-url').value;
+        const attribution = document.getElementById('layer-attribution').value;
+
+        // Validate URL
+        const urlError = document.getElementById('url-error');
+
+        const isValidUrl = function (url) {
+          const webUrlPattern = /^https?:\/\/\S+/;
+          const fileUrlPattern = /^file:\/\/\S+/;
+
+          if (webUrlPattern.test(url) || fileUrlPattern.test(url)) {
+            return true;
+          }
+
+          return false;
+        };
+
+        if (!isValidUrl(url)) {
+          urlError.textContent = 'Please enter a valid URL (http://, https://, or file://)';
+          urlError.style.display = 'block';
+          return;
+        }
+
+        // Check for required placeholder tokens
+        if (!url.includes('{z}') || !url.includes('{x}') || !url.includes('{y}')) {
+          urlError.textContent = 'URL must include {z}, {x}, and {y} placeholders';
+          urlError.style.display = 'block';
+          return;
+        }
+
+        urlError.style.display = 'none';
+
+        // Add the custom layer
+        const layerId = addCustomLayer(name, url, attribution);
+
+        // Reset form
+        form.reset();
+
+        // Close dialog
+        dialog.classList.remove('visible');
+
+        // Switch to the new layer
+        const button = document.querySelector(`.map-button[data-layer="${layerId}"]`);
+        if (button) {
+          button.click();
+        }
+      });
+    }
     // Initialize everything
     function init() {
       // Try to load saved content from localStorage
@@ -1361,6 +1890,12 @@ srs: 'EPSG:4326'`;
             updateFormatExample(detectedProjection);
           }
         }
+
+        // Load saved current layer
+        const savedLayer = localStorage.getItem('boundingBoxMapCurrentLayer');
+        if (savedLayer) {
+          currentLayer = savedLayer;
+        }
       } catch (e) {
         console.warn('Failed to load from localStorage:', e);
         // Fall back to default data
@@ -1375,6 +1910,9 @@ srs: 'EPSG:4326'`;
 
       // Initialize the map
       initMap();
+
+      // Initialize custom layer dialog
+      initCustomLayerDialog();
 
       // Set up the text input events
       textarea.addEventListener('input', handleTextareaInput);
@@ -1420,6 +1958,7 @@ srs: 'EPSG:4326'`;
     // Start when DOM is ready
     document.addEventListener('DOMContentLoaded', init);
   </script>
+
 </body>
 
 </html>
