@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TMS Missing Tiles Checker</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        #container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        #controls {
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+        }
+        #map {
+            flex-grow: 1;
+        }
+        .control-group {
+            margin-bottom: 10px;
+        }
+        label {
+            display: inline-block;
+            width: 120px;
+            font-weight: bold;
+        }
+        button {
+            padding: 8px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        select {
+            padding: 5px;
+            width: 100px;
+        }
+        #status {
+            margin-top: 10px;
+            padding: 8px;
+            background-color: #f8f8f8;
+            border-radius: 4px;
+            display: none;
+        }
+        .progress-container {
+            margin-top: 10px;
+            padding: 8px;
+            background-color: #f8f8f8;
+            border-radius: 4px;
+            display: none;
+        }
+        .progress-bar {
+            height: 20px;
+            background-color: #e0e0e0;
+            border-radius: 4px;
+            margin-top: 5px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #4CAF50;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        .progress-text {
+            margin-top: 5px;
+            font-size: 12px;
+            color: #555;
+        }
+        .missing-tile {
+            background-color: rgba(255, 0, 0, 0.3);
+            border: 1px solid red;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        .found-tile {
+            background-color: rgba(0, 255, 0, 0.2);
+            border: 1px solid green;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        .legend {
+            padding: 6px 8px;
+            background: white;
+            background: rgba(255, 255, 255, 0.8);
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+            border-radius: 5px;
+            line-height: 24px;
+            color: #555;
+        }
+        .legend span {
+            width: 18px;
+            height: 18px;
+            float: left;
+            margin-right: 8px;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="controls">
+            <div class="control-group">
+                <label for="directoryBtn">TMS Directory:</label>
+                <button id="directoryBtn">Select Directory</button>
+                <span id="selectedDir"></span>
+            </div>
+            <div class="control-group">
+                <label for="zoomLevel">Zoom Level:</label>
+                <select id="zoomLevel" disabled>
+                    <option value="0">0</option>
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                    <option value="7">7</option>
+                    <option value="8">8</option>
+                    <option value="9">9</option>
+                    <option value="10">10</option>
+                    <option value="11">11</option>
+                    <option value="12">12</option>
+                    <option value="13">13</option>
+                    <option value="14">14</option>
+                    <option value="15">15</option>
+                    <option value="16">16</option>
+                    <option value="17">17</option>
+                    <option value="18">18</option>
+                </select>
+                <button id="checkBtn" disabled>Check Missing Tiles</button>
+            </div>
+            <div id="status"></div>
+            <div class="progress-container">
+                <div class="progress-text">Checking tiles...</div>
+                <div class="progress-bar">
+                    <div class="progress-fill"></div>
+                </div>
+                <div class="progress-stats">0/0 tiles checked</div>
+            </div>
+        </div>
+        <div id="map"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <script>
+        // Initialize map
+        const map = L.map('map').setView([0, 0], 2);
+        
+        // Add OpenStreetMap tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Add a legend
+        const legend = L.control({position: 'bottomright'});
+        legend.onAdd = function(map) {
+            const div = L.DomUtil.create('div', 'legend');
+            div.innerHTML = '<span style="background: rgba(255, 0, 0, 0.3)"></span> Missing Tiles<br>' +
+                           '<span style="background: rgba(0, 255, 0, 0.2)"></span> Found Tiles';
+            return div;
+        };
+        legend.addTo(map);
+
+        // Variables to store app state
+        let directoryHandle = null;
+        let tilesLayer = null;
+        let intermediateLayer = null; // Separate layer for intermediate visualizations
+        let currentBounds = null;
+        let checkingInProgress = false;
+        let abortController = null;
+        
+        // Elements
+        const directoryBtn = document.getElementById('directoryBtn');
+        const selectedDirSpan = document.getElementById('selectedDir');
+        const zoomLevelSelect = document.getElementById('zoomLevel');
+        const checkBtn = document.getElementById('checkBtn');
+        const statusDiv = document.getElementById('status');
+        const progressContainer = document.querySelector('.progress-container');
+        const progressFill = document.querySelector('.progress-fill');
+        const progressStats = document.querySelector('.progress-stats');
+        
+        // Check if File System Access API is supported
+        if (!('showDirectoryPicker' in window)) {
+            alert('Your browser does not support the File System Access API. Please use Chrome, Edge, or another browser that supports this feature.');
+            directoryBtn.disabled = true;
+        }
+        
+        // Event Listeners
+        directoryBtn.addEventListener('click', selectDirectory);
+        checkBtn.addEventListener('click', checkTiles);
+        zoomLevelSelect.addEventListener('change', function() {
+            if (directoryHandle) {
+                checkBtn.disabled = false;
+            }
+        });
+        
+        // Map event listener to update bounds
+        map.on('moveend', function() {
+            currentBounds = map.getBounds();
+        });
+        
+        // Initialize currentBounds
+        currentBounds = map.getBounds();
+        
+        async function selectDirectory() {
+            try {
+                directoryHandle = await window.showDirectoryPicker();
+                selectedDirSpan.textContent = directoryHandle.name;
+                zoomLevelSelect.disabled = false;
+                checkBtn.disabled = false;
+                
+                // Find available zoom levels
+                updateAvailableZoomLevels();
+            } catch (error) {
+                console.error('Error selecting directory:', error);
+                if (error.name !== 'AbortError') {
+                    alert('Error accessing directory: ' + error.message);
+                }
+            }
+        }
+        
+        async function updateAvailableZoomLevels() {
+            try {
+                // Clear current options
+                zoomLevelSelect.innerHTML = '';
+                
+                // Try to list all directories in the selected folder
+                // These should be zoom levels
+                for await (const entry of directoryHandle.values()) {
+                    if (entry.kind === 'directory' && !isNaN(parseInt(entry.name))) {
+                        const option = document.createElement('option');
+                        option.value = entry.name;
+                        option.textContent = entry.name;
+                        zoomLevelSelect.appendChild(option);
+                    }
+                }
+                
+                // If no zoom levels found, add default options
+                if (zoomLevelSelect.options.length === 0) {
+                    for (let z = 0; z <= 18; z++) {
+                        const option = document.createElement('option');
+                        option.value = z;
+                        option.textContent = z;
+                        zoomLevelSelect.appendChild(option);
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating zoom levels:', error);
+            }
+        }
+        
+        // Keep the old tileExists function as a fallback
+        async function tileExists(zoomDirHandle, x, y) {
+            try {
+                // Check if x directory exists
+                let xDirHandle;
+                try {
+                    xDirHandle = await zoomDirHandle.getDirectoryHandle(x.toString());
+                } catch {
+                    return false;
+                }
+                
+                // Check if y.jpeg file exists
+                try {
+                    // Try common extensions: .jpeg, .png, .jpg
+                    await xDirHandle.getFileHandle(y + '.jpeg');
+                    return true;
+                } catch {
+                    try {
+                        await xDirHandle.getFileHandle(y + '.png');
+                        return true;
+                    } catch {
+                        try {
+                            await xDirHandle.getFileHandle(y + '.jpg');
+                            return true;
+                        } catch {
+                            return false;
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error(`Error checking if tile ${x}/${y} exists:`, error);
+                return false;
+            }
+        }
+        
+        function getTileRange(bounds, zoom) {
+            // Convert from latlng to tile coordinates
+            function latLngToTile(lat, lng, z) {
+                const n = Math.pow(2, z);
+                const x = Math.floor((lng + 180) / 360 * n);
+                const latRad = lat * Math.PI / 180;
+                const y = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n);
+                return {x, y};
+            }
+            
+            // Get tile coordinates for the bounding corners
+            const nw = latLngToTile(bounds.getNorth(), bounds.getWest(), zoom);
+            const se = latLngToTile(bounds.getSouth(), bounds.getEast(), zoom);
+            
+            return {
+                minX: nw.x,
+                maxX: se.x,
+                minY: nw.y,
+                maxY: se.y
+            };
+        }
+        
+        function tileToLatLng(x, y, z) {
+            // Convert tile coordinates to latlng coordinates
+            const n = Math.pow(2, z);
+            const lng = x / n * 360 - 180;
+            const latRad = Math.atan(Math.sinh(Math.PI * (1 - 2 * y / n)));
+            const lat = latRad * 180 / Math.PI;
+            return [lat, lng];
+        }
+        
+        function tileToLatLngBounds(x, y, z) {
+            // Convert tile coordinates to latlng bounds
+            const nw = tileToLatLng(x, y, z);
+            const se = tileToLatLng(x + 1, y + 1, z);
+            
+            return [nw, se];
+        }
+        
+        function getRegionBounds(minX, maxX, minY, maxY, zoom) {
+            // Convert tile coordinates to latlng bounds
+            const nw = tileToLatLng(minX, minY, zoom);
+            const se = tileToLatLng(maxX + 1, maxY + 1, zoom);
+            
+            return [nw, se];
+        }
+        
+        function resetCheckUI() {
+            checkingInProgress = false;
+            abortController = null;
+            checkBtn.textContent = "Check Missing Tiles";
+            // Keep progress bar visible to show the final result
+        }
+        
+        function displayTile(tile, zoom, exists) {
+            // Convert tile coordinates to latlng bounds
+            const bounds = tileToLatLngBounds(tile.x, tile.y, zoom);
+            
+            // Create a rectangle for the tile
+            const rectangle = L.rectangle(bounds, {
+                color: exists ? 'green' : 'red',
+                weight: 1,
+                fillColor: exists ? 'green' : 'red',
+                fillOpacity: exists ? 0.2 : 0.3,
+                className: exists ? 'found-tile' : 'missing-tile'
+            }).addTo(tilesLayer);
+            
+            // Add a popup with tile coordinates
+            const status = exists ? 'Found' : 'Missing';
+            rectangle.bindPopup(`${status} Tile: ${zoom}/${tile.x}/${tile.y}`);
+        }
+        
+        async function checkTiles() {
+            try {
+                if (checkingInProgress) {
+                    // If a check is already in progress, cancel it
+                    if (abortController) {
+                        abortController.abort();
+                        abortController = null;
+                    }
+                    checkingInProgress = false;
+                    checkBtn.textContent = "Check Missing Tiles";
+                    progressContainer.style.display = 'none';
+                    return;
+                }
+
+                console.log("Starting tile check...");
+
+                // Clear previous layers
+                if (tilesLayer) {
+                    map.removeLayer(tilesLayer);
+                }
+                if (intermediateLayer) {
+                    map.removeLayer(intermediateLayer);
+                }
+                
+                // Create new layer groups
+                tilesLayer = L.layerGroup().addTo(map);
+                intermediateLayer = L.layerGroup().addTo(map);
+                
+                const zoom = parseInt(zoomLevelSelect.value);
+                statusDiv.style.display = 'block';
+                statusDiv.textContent = 'Scanning for tiles at zoom level ' + zoom + '...';
+                
+                // Set up progress bar
+                progressContainer.style.display = 'block';
+                progressFill.style.width = '0%';
+                
+                // Set up abort controller for cancelation
+                abortController = new AbortController();
+                checkingInProgress = true;
+                checkBtn.textContent = "Cancel Check";
+                
+                // Get the zoom level directory
+                let zoomDirHandle;
+                try {
+                    console.log("Getting zoom directory:", zoom);
+                    zoomDirHandle = await directoryHandle.getDirectoryHandle(zoom.toString());
+                } catch (error) {
+                    // Zoom directory doesn't exist
+                    console.error("Zoom directory not found:", error);
+                    statusDiv.textContent = 'Zoom level ' + zoom + ' directory not found.';
+                    resetCheckUI();
+                    return;
+                }
+                
+                // Scan directories and plot tiles in one pass
+                statusDiv.textContent = 'Scanning and plotting tiles...';
+                console.log("Starting tile scan and plot...");
+                
+                const result = await scanAndPlotTiles(zoomDirHandle, zoom);
+                
+                if (result.tileCount === 0) {
+                    statusDiv.textContent = 'No tiles found at zoom level ' + zoom + '.';
+                } else {
+                    // Final status update
+                    statusDiv.textContent = `Found ${result.tileCount} tiles at zoom level ${zoom}.`;
+                }
+                
+            } catch (error) {
+                console.error('Error checking tiles:', error);
+                if (error.name !== 'AbortError') {
+                    statusDiv.textContent = 'Error checking tiles: ' + error.message;
+                    alert('Error: ' + error.message);
+                } else {
+                    statusDiv.textContent = 'Tile checking canceled.';
+                }
+            } finally {
+                resetCheckUI();
+            }
+        }
+        
+        async function scanAndPlotTiles(zoomDirHandle, zoom) {
+            console.log("Starting tile scan and plot...");
+            const tileIndex = new Set(); // For fast O(1) lookups
+            let minX = Infinity, maxX = -Infinity;
+            let minY = Infinity, maxY = -Infinity;
+            let hasZoomedToRegion = false;
+            
+            // To track progress
+            let processedXDirs = 0;
+            let totalTilesFound = 0;
+            let estimatedTotalXDirs = 100; // Initial estimate, will update
+            
+            try {
+                // First, get a count of X directories for progress tracking
+                let xDirCount = 0;
+                const xDirs = [];
+                for await (const entry of zoomDirHandle.values()) {
+                    if (entry.kind === 'directory' && !isNaN(parseInt(entry.name))) {
+                        xDirCount++;
+                        xDirs.push(parseInt(entry.name));
+                    }
+                }
+                estimatedTotalXDirs = Math.max(1, xDirCount); // Ensure we don't divide by zero
+                console.log(`Found ${estimatedTotalXDirs} X directories to process`);
+                
+                // Sort X directories numerically
+                xDirs.sort((a, b) => a - b);
+                
+                // Variables for tracking current block
+                let currentXStart = null;
+                let currentXEnd = null;
+                let currentRanges = null;
+                let currentYMin = Infinity;
+                let currentYMax = -Infinity;
+                let accumulatedDirs = 0;
+                
+                // Determine visualization threshold based on total X directories
+                // For fewer directories, update more frequently
+                const visualizationThreshold = Math.max(3, Math.min(10, Math.floor(xDirs.length / 20)));
+                console.log(`Visualization threshold set to ${visualizationThreshold} directories`);
+                
+                // Process each X directory in order
+                for (let i = 0; i < xDirs.length; i++) {
+                    if (abortController.signal.aborted) {
+                        throw new DOMException('Tile checking was aborted', 'AbortError');
+                    }
+                    
+                    const x = xDirs[i];
+                    processedXDirs++;
+                    const xProgress = (processedXDirs / estimatedTotalXDirs) * 100;
+                    progressFill.style.width = `${xProgress}%`;
+                    progressStats.textContent = `Processed ${processedXDirs}/${estimatedTotalXDirs} directories, found ${totalTilesFound} tiles`;
+                    
+                    statusDiv.textContent = `Scanning X directory ${x} (${processedXDirs}/${estimatedTotalXDirs})...`;
+                    
+                    try {
+                        // Get Y ranges for this X directory
+                        const { yRanges, yValues, yMin, yMax } = await getYRangesForXDir(zoomDirHandle, x);
+                        
+                        // If we found any tiles in this directory
+                        if (yValues.length > 0) {
+                            // Update min/max values for the entire region
+                            if (minX === Infinity) {
+                                minX = maxX = x;
+                                minY = yMin;
+                                maxY = yMax;
+                            } else {
+                                minX = Math.min(minX, x);
+                                maxX = Math.max(maxX, x);
+                                minY = Math.min(minY, yMin);
+                                maxY = Math.max(maxY, yMax);
+                            }
+                            
+                            // Add all tiles to the index
+                            for (const y of yValues) {
+                                const tileKey = `${x},${y}`;
+                                if (!tileIndex.has(tileKey)) {
+                                    tileIndex.add(tileKey);
+                                    totalTilesFound++;
+                                }
+                            }
+                            
+                            // Check if we should extend current block or start a new one
+                            if (currentRanges === null) {
+                                // First block, start accumulation
+                                currentXStart = currentXEnd = x;
+                                currentRanges = yRanges;
+                                currentYMin = yMin;
+                                currentYMax = yMax;
+                                accumulatedDirs = 1;
+                            } else if (rangesAreIdentical(currentRanges, yRanges)) {
+                                // Ranges match, extend current block
+                                currentXEnd = x;
+                                currentYMin = Math.min(currentYMin, yMin);
+                                currentYMax = Math.max(currentYMax, yMax);
+                                accumulatedDirs++;
+                                
+                                // Periodically visualize accumulated region for better feedback
+                                if (accumulatedDirs % visualizationThreshold === 0) {
+                                    // Plot intermediate visualization but continue accumulating
+                                    plotRangeBlocks(currentXStart, currentXEnd, currentRanges, currentYMin, currentYMax, zoom, true);
+                                    statusDiv.textContent = `Found pattern spanning ${accumulatedDirs} directories. Continuing scan...`;
+                                }
+                            } else {
+                                // Different pattern, plot current block and start a new one
+                                plotRangeBlocks(currentXStart, currentXEnd, currentRanges, currentYMin, currentYMax, zoom, false);
+                                
+                                // Start a new accumulation
+                                currentXStart = currentXEnd = x;
+                                currentRanges = yRanges;
+                                currentYMin = yMin;
+                                currentYMax = yMax;
+                                accumulatedDirs = 1;
+                            }
+                            
+                            // Try to zoom to region after finding some tiles
+                            if (!hasZoomedToRegion && totalTilesFound > 10) {
+                                hasZoomedToRegion = true;
+                                console.log("Zooming to initial region:", {minX, maxX, minY, maxY});
+                                const bounds = getRegionBounds(minX, maxX, minY, maxY, zoom);
+                                map.fitBounds(bounds, { padding: [50, 50] });
+                            }
+                            
+                            // Update the count
+                            progressStats.textContent = `Processed ${processedXDirs}/${estimatedTotalXDirs} directories, found ${totalTilesFound} tiles`;
+                        }
+                    } catch (error) {
+                        console.warn(`Error reading directory ${x}:`, error);
+                    }
+                }
+                
+                // Plot any remaining block
+                if (currentRanges !== null) {
+                    plotRangeBlocks(currentXStart, currentXEnd, currentRanges, currentYMin, currentYMax, zoom, false);
+                }
+                
+                // Final region adjustment if we've found tiles and haven't zoomed yet
+                if (totalTilesFound > 0 && !hasZoomedToRegion) {
+                    console.log("Zooming to final region:", {minX, maxX, minY, maxY});
+                    const bounds = getRegionBounds(minX, maxX, minY, maxY, zoom);
+                    map.fitBounds(bounds, { padding: [50, 50] });
+                }
+                
+                // Compute and display missing tile information
+                if (totalTilesFound > 0) {
+                    calculateMissingTileStats(tileIndex, minX, maxX, minY, maxY);
+                }
+                
+                console.log(`Completed scan with ${totalTilesFound} tiles found`);
+                
+                // Handle the case when no valid tiles were found
+                if (totalTilesFound === 0) {
+                    minX = maxX = minY = maxY = 0;
+                }
+                
+            } catch (error) {
+                console.error('Error scanning and plotting tiles:', error);
+                throw error;
+            }
+            
+            return { 
+                tileCount: totalTilesFound,
+                minX, maxX, minY, maxY
+            };
+        }
+        
+        async function getYRangesForXDir(zoomDirHandle, x) {
+            const xDirHandle = await zoomDirHandle.getDirectoryHandle(x.toString());
+            
+            // Collect all Y values for this X
+            const yValues = [];
+            for await (const yEntry of xDirHandle.values()) {
+                if (yEntry.kind === 'file') {
+                    // Extract y value from filename (remove extension)
+                    const filename = yEntry.name;
+                    const y = parseInt(filename.split('.')[0]);
+                    if (!isNaN(y)) {
+                        yValues.push(y);
+                    }
+                }
+            }
+            
+            // Sort Y values and find min/max
+            yValues.sort((a, b) => a - b);
+            const yMin = yValues.length > 0 ? yValues[0] : 0;
+            const yMax = yValues.length > 0 ? yValues[yValues.length - 1] : 0;
+            
+            // Find contiguous segments in Y values
+            const yRanges = findContiguousSegments(yValues);
+            
+            return { yRanges, yValues, yMin, yMax };
+        }
+        
+        function rangesAreIdentical(ranges1, ranges2) {
+            if (ranges1.length !== ranges2.length) return false;
+            
+            for (let i = 0; i < ranges1.length; i++) {
+                if (ranges1[i][0] !== ranges2[i][0] || ranges1[i][1] !== ranges2[i][1]) {
+                    return false;
+                }
+            }
+            
+            return true;
+        }
+        
+        function plotRangeBlocks(xStart, xEnd, foundRanges, yMin, yMax, zoom, isIntermediate = false) {
+            // Determine which layer to use
+            const targetLayer = isIntermediate ? intermediateLayer : tilesLayer;
+            
+            // If this is a final visualization (not intermediate), clear the intermediate layer
+            // This ensures we don't have overlapping visuals when transitioning between patterns
+            if (!isIntermediate && intermediateLayer) {
+                intermediateLayer.clearLayers();
+            }
+            
+            // If this is an intermediate visualization, clear previous intermediate layer
+            if (isIntermediate) {
+                intermediateLayer.clearLayers();
+            }
+            
+            // First, plot all found ranges
+            for (const [startY, endY] of foundRanges) {
+                displayTileBlock(xStart, xEnd, startY, endY, zoom, true, targetLayer);
+            }
+            
+            // Then calculate and plot missing ranges
+            const missingRanges = findMissingRanges(foundRanges, yMin, yMax);
+            for (const [startY, endY] of missingRanges) {
+                displayTileBlock(xStart, xEnd, startY, endY, zoom, false, targetLayer);
+            }
+            
+            // If this is an intermediate visualization, make a note in the console
+            if (isIntermediate) {
+                console.log(`Plotted intermediate visualization for x=${xStart} to x=${xEnd}`);
+            } else {
+                console.log(`Plotted final visualization for x=${xStart} to x=${xEnd}`);
+            }
+        }
+        
+        function findMissingRanges(foundRanges, yMin, yMax) {
+            const missingRanges = [];
+            
+            // If no found ranges, everything is missing
+            if (foundRanges.length === 0) {
+                missingRanges.push([yMin, yMax]);
+                return missingRanges;
+            }
+            
+            // Check before first found range
+            if (foundRanges[0][0] > yMin) {
+                missingRanges.push([yMin, foundRanges[0][0] - 1]);
+            }
+            
+            // Check between found ranges
+            for (let i = 0; i < foundRanges.length - 1; i++) {
+                const currentEnd = foundRanges[i][1];
+                const nextStart = foundRanges[i + 1][0];
+                
+                if (nextStart > currentEnd + 1) {
+                    missingRanges.push([currentEnd + 1, nextStart - 1]);
+                }
+            }
+            
+            // Check after last found range
+            if (foundRanges[foundRanges.length - 1][1] < yMax) {
+                missingRanges.push([foundRanges[foundRanges.length - 1][1] + 1, yMax]);
+            }
+            
+            return missingRanges;
+        }
+        
+        function calculateMissingTileStats(tileIndex, minX, maxX, minY, maxY) {
+            let totalTiles = 0;
+            let missingCount = 0;
+            
+            for (let x = minX; x <= maxX; x++) {
+                for (let y = minY; y <= maxY; y++) {
+                    totalTiles++;
+                    if (!tileIndex.has(`${x},${y}`)) {
+                        missingCount++;
+                    }
+                }
+            }
+            
+            const foundCount = totalTiles - missingCount;
+            const coverage = (foundCount / totalTiles * 100).toFixed(2);
+            
+            statusDiv.textContent = `Found ${foundCount} tiles and ${missingCount} missing tiles (${coverage}% coverage).`;
+            return { totalTiles, foundCount, missingCount, coverage };
+        }
+        
+        function findContiguousSegments(sortedValues) {
+            if (sortedValues.length === 0) return [];
+            
+            const segments = [];
+            let segmentStart = sortedValues[0];
+            let segmentEnd = sortedValues[0];
+            
+            for (let i = 1; i < sortedValues.length; i++) {
+                if (sortedValues[i] === segmentEnd + 1) {
+                    // Continue the current segment
+                    segmentEnd = sortedValues[i];
+                } else {
+                    // End the current segment and start a new one
+                    segments.push([segmentStart, segmentEnd]);
+                    segmentStart = segmentEnd = sortedValues[i];
+                }
+            }
+            
+            // Add the last segment
+            segments.push([segmentStart, segmentEnd]);
+            
+            return segments;
+        }
+        
+        function displayTileBlock(startX, endX, startY, endY, zoom, exists, targetLayer) {
+            // Convert tile coordinates to latlng bounds
+            const nwPoint = tileToLatLng(startX, startY, zoom);
+            const sePoint = tileToLatLng(endX + 1, endY + 1, zoom);
+            const bounds = [nwPoint, sePoint];
+            
+            // Create a rectangle for the tile block
+            const rectangle = L.rectangle(bounds, {
+                color: exists ? 'green' : 'red',
+                weight: 1,
+                fillColor: exists ? 'green' : 'red',
+                fillOpacity: exists ? 0.2 : 0.3,
+                className: exists ? 'found-tile' : 'missing-tile'
+            }).addTo(targetLayer);
+            
+            // Add a popup with tile coordinates
+            const status = exists ? 'Found' : 'Missing';
+            const tileCount = (endX - startX + 1) * (endY - startY + 1);
+            let popupContent = `${status} Tiles: ${zoom}/${startX}-${endX}/${startY}-${endY}`;
+            if (tileCount > 1) {
+                popupContent += ` (${tileCount} tiles)`;
+            }
+            rectangle.bindPopup(popupContent);
+        }
+        
+
+    </script>
+</body>
+</html>
