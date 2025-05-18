@@ -457,7 +457,6 @@
         
         async function scanAndPlotTiles(zoomDirHandle, zoom) {
             console.log("Starting tile scan and plot...");
-            const tileIndex = new Set(); // For fast O(1) lookups
             let minX = Infinity, maxX = -Infinity;
             let minY = Infinity, maxY = -Infinity;
             let hasZoomedToRegion = false;
@@ -514,6 +513,7 @@
                         // Get Y ranges for this X directory
                         const { yRanges, yValues, yMin, yMax } = await getYRangesForXDir(zoomDirHandle, x);
                         
+                        totalTilesFound += yValues.length;
                         // If we found any tiles in this directory
                         if (yValues.length > 0) {
                             // Update min/max values for the entire region
@@ -527,16 +527,7 @@
                                 minY = Math.min(minY, yMin);
                                 maxY = Math.max(maxY, yMax);
                             }
-                            
-                            // Add all tiles to the index
-                            for (const y of yValues) {
-                                const tileKey = `${x},${y}`;
-                                if (!tileIndex.has(tileKey)) {
-                                    tileIndex.add(tileKey);
-                                    totalTilesFound++;
-                                }
-                            }
-                            
+                                                        
                             // Check if we should extend current block or start a new one
                             if (currentRanges === null) {
                                 // First block, start accumulation
@@ -597,12 +588,7 @@
                     const bounds = getRegionBounds(minX, maxX, minY, maxY, zoom);
                     map.fitBounds(bounds, { padding: [50, 50] });
                 }
-                
-                // Compute and display missing tile information
-                if (totalTilesFound > 0) {
-                    calculateMissingTileStats(tileIndex, minX, maxX, minY, maxY);
-                }
-                
+                                
                 console.log(`Completed scan with ${totalTilesFound} tiles found`);
                 
                 // Handle the case when no valid tiles were found
@@ -724,26 +710,6 @@
             }
             
             return missingRanges;
-        }
-        
-        function calculateMissingTileStats(tileIndex, minX, maxX, minY, maxY) {
-            let totalTiles = 0;
-            let missingCount = 0;
-            
-            for (let x = minX; x <= maxX; x++) {
-                for (let y = minY; y <= maxY; y++) {
-                    totalTiles++;
-                    if (!tileIndex.has(`${x},${y}`)) {
-                        missingCount++;
-                    }
-                }
-            }
-            
-            const foundCount = totalTiles - missingCount;
-            const coverage = (foundCount / totalTiles * 100).toFixed(2);
-            
-            statusDiv.textContent = `Found ${foundCount} tiles and ${missingCount} missing tiles (${coverage}% coverage).`;
-            return { totalTiles, foundCount, missingCount, coverage };
         }
         
         function findContiguousSegments(sortedValues) {
