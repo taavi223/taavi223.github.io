@@ -880,7 +880,7 @@ srs: 'EPSG:4326'`;
       map = L.map('map').setView([37.7, -122.4], 6);
 
       // Define base layers
-      const baseLayers = {
+      baseLayers = {
         streets: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           maxZoom: 19,
           subdomains: ['a', 'b', 'c'],
@@ -898,8 +898,17 @@ srs: 'EPSG:4326'`;
         )
       };
 
-      // Add the default base layer
-      baseLayers[currentLayer].addTo(map);
+      // Load custom layers before adding the default base layer
+      loadCustomLayers();
+
+      // Add the default base layer - with fallback if the saved layer doesn't exist
+      if (baseLayers[currentLayer]) {
+        baseLayers[currentLayer].addTo(map);
+      } else {
+        // Fallback to streets layer if the saved layer doesn't exist
+        currentLayer = 'streets';
+        baseLayers[currentLayer].addTo(map);
+      }
 
       // Initialize editable layer group
       editableLayers = new L.FeatureGroup();
@@ -910,19 +919,36 @@ srs: 'EPSG:4326'`;
         button.addEventListener('click', function () {
           const layerName = this.getAttribute('data-layer');
 
-          // Remove active class from all buttons
-          mapButtons.forEach(btn => btn.classList.remove('active'));
-
-          // Add active class to clicked button
-          this.classList.add('active');
+          // Update the current layer
+          currentLayer = layerName;
+          
+          // Update button states
+          updateActiveLayerButton();
 
           // Remove current layer and add the selected one
           if (map.hasLayer(baseLayers[currentLayer])) {
             map.removeLayer(baseLayers[currentLayer]);
           }
-
+          
+          // Set the new current layer
           currentLayer = layerName;
-          baseLayers[currentLayer].addTo(map);
+          
+          // Verify the layer exists and add it
+          if (baseLayers[currentLayer]) {
+            baseLayers[currentLayer].addTo(map);
+          } else {
+            // Fallback to streets layer if the requested layer doesn't exist
+            currentLayer = 'streets';
+            baseLayers[currentLayer].addTo(map);
+            updateActiveLayerButton(); // Update buttons again to reflect the fallback
+          }
+          
+          // Save the current layer to localStorage
+          try {
+            localStorage.setItem('boundingBoxMapCurrentLayer', currentLayer);
+          } catch (e) {
+            console.warn('Failed to save current layer to localStorage:', e);
+          }
         });
       });
 
@@ -1697,20 +1723,26 @@ srs: 'EPSG:4326'`;
       button.addEventListener('click', function () {
         const layerName = this.getAttribute('data-layer');
 
-        // Remove active class from all buttons
-        const allButtons = document.querySelectorAll('.map-button');
-        allButtons.forEach(btn => btn.classList.remove('active'));
-
-        // Add active class to clicked button
-        this.classList.add('active');
+        // Update the current layer
+        currentLayer = layerName;
+        
+        // Update button states
+        updateActiveLayerButton();
 
         // Remove current layer and add the selected one
         if (map.hasLayer(baseLayers[currentLayer])) {
           map.removeLayer(baseLayers[currentLayer]);
         }
-
-        currentLayer = layerName;
-        baseLayers[currentLayer].addTo(map);
+          
+        // Verify the layer exists and add it
+        if (baseLayers[currentLayer]) {
+          baseLayers[currentLayer].addTo(map);
+        } else {
+          // Fallback to streets layer if the requested layer doesn't exist
+          currentLayer = 'streets';
+          baseLayers[currentLayer].addTo(map);
+          updateActiveLayerButton(); // Update buttons again to reflect the fallback
+        }
 
         // Save the current layer to localStorage
         try {
@@ -1849,13 +1881,40 @@ srs: 'EPSG:4326'`;
         dialog.classList.remove('visible');
 
         // Switch to the new layer
-        const button = document.querySelector(`.map-button[data-layer="${layerId}"]`);
-        if (button) {
-          button.click();
+        if (baseLayers[layerId]) {
+          // Remove current layer
+          if (map.hasLayer(baseLayers[currentLayer])) {
+            map.removeLayer(baseLayers[currentLayer]);
+          }
+          
+          // Set new layer as current and add to map
+          currentLayer = layerId;
+          baseLayers[currentLayer].addTo(map);
+          
+          // Update button states
+          updateActiveLayerButton();
+          
+          // Save the current layer to localStorage
+          try {
+            localStorage.setItem('boundingBoxMapCurrentLayer', currentLayer);
+          } catch (e) {
+            console.warn('Failed to save current layer to localStorage:', e);
+          }
         }
       });
     }
     // Initialize everything
+    // Helper function to update the active layer button
+    function updateActiveLayerButton() {
+      document.querySelectorAll('.map-button').forEach(btn => {
+        if (btn.getAttribute('data-layer') === currentLayer) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+    }
+    
     function init() {
       // Try to load saved content from localStorage
       try {
@@ -1895,11 +1954,14 @@ srs: 'EPSG:4326'`;
         const savedLayer = localStorage.getItem('boundingBoxMapCurrentLayer');
         if (savedLayer) {
           currentLayer = savedLayer;
+        } else {
+          currentLayer = 'streets'; // Default to streets if no saved layer
         }
       } catch (e) {
         console.warn('Failed to load from localStorage:', e);
         // Fall back to default data
         textarea.value = defaultData;
+        currentLayer = 'streets'; // Default to streets
       }
 
       // Set up precision selector
@@ -1913,6 +1975,9 @@ srs: 'EPSG:4326'`;
 
       // Initialize custom layer dialog
       initCustomLayerDialog();
+
+      // Set current layer button as active
+      updateActiveLayerButton();
 
       // Set up the text input events
       textarea.addEventListener('input', handleTextareaInput);
