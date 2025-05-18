@@ -71,23 +71,27 @@
       gap: 0.5rem;
     }
 
-    .precision-controls {
+    .precision-controls, .projection-controls {
       display: flex;
       align-items: center;
       gap: 0.5rem;
     }
 
-    .precision-label {
+    .precision-label, .projection-label {
       font-size: 0.875rem;
       color: #4b5563;
     }
 
-    .precision-select {
+    .precision-select, .projection-select {
       padding: 0.25rem;
       border-radius: 0.25rem;
       border: 1px solid #d1d5db;
       font-size: 0.875rem;
       min-width: 4rem;
+    }
+
+    .projection-select {
+      min-width: 12rem;
     }
 
     .map-button {
@@ -341,6 +345,14 @@
       width: 2px;
       height: 10px;
     }
+
+    /* Format example styling */
+    .format-example {
+      font-size: 0.8rem;
+      color: #6b7280;
+      margin-top: 0.25rem;
+      font-style: italic;
+    }
   </style>
 </head>
 
@@ -358,25 +370,41 @@
           <button class="map-button" data-layer="hybrid">Hybrid</button>
         </div>
 
-        <div class="precision-controls">
-          <label class="precision-label" for="precision-select">Coordinate Precision:</label>
-          <select class="precision-select" id="precision-select">
-            <option value="0">0 decimals</option>
-            <option value="1">1 decimal</option>
-            <option value="2">2 decimals</option>
-            <option value="3">3 decimals</option>
-            <option value="4">4 decimals</option>
-            <option value="5">5 decimals</option>
-            <option value="6">6 decimals</option>
-            <option value="7">7 decimals</option>
-            <option value="8">8 decimals</option>
-            <option value="9">9 decimals</option>
-            <option value="10">10 decimals</option>
-            <option value="11">11 decimals</option>
-            <option value="12">12 decimals</option>
-            <option value="13" selected>13 decimals</option>
-          </select>
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+          <div class="projection-controls">
+            <label class="projection-label" for="projection-select">Coordinate System:</label>
+            <select class="projection-select" id="projection-select">
+              <option value="">Auto-detect</option>
+              <option value="EPSG:4326">EPSG:4326 (WGS84)</option>
+              <option value="EPSG:3857">EPSG:3857 (Web Mercator)</option>
+              <option value="EPSG:900913">EPSG:900913 (Web Mercator)</option>
+              <option value="EPSG:3785">EPSG:3785 (Web Mercator)</option>
+            </select>
+          </div>
+          
+          <div class="precision-controls">
+            <label class="precision-label" for="precision-select">Coordinate Precision:</label>
+            <select class="precision-select" id="precision-select">
+              <option value="0">0 decimals</option>
+              <option value="1">1 decimal</option>
+              <option value="2">2 decimals</option>
+              <option value="3">3 decimals</option>
+              <option value="4">4 decimals</option>
+              <option value="5">5 decimals</option>
+              <option value="6">6 decimals</option>
+              <option value="7">7 decimals</option>
+              <option value="8">8 decimals</option>
+              <option value="9">9 decimals</option>
+              <option value="10">10 decimals</option>
+              <option value="11">11 decimals</option>
+              <option value="12">12 decimals</option>
+              <option value="13" selected>13 decimals</option>
+            </select>
+          </div>
         </div>
+      </div>
+      <div class="format-example" id="format-example">
+        Example: bbox: [-122.5, 37.2, -121.7, 38.0], srs: 'EPSG:4326'
       </div>
     </div>
 
@@ -403,6 +431,9 @@
   <!-- Leaflet.Draw JS -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
+  <!-- proj4js for coordinate transformations -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
+
   <script>
     // Main variables
     let map;
@@ -411,6 +442,16 @@
     let parsedBoxes = [];
     let editableLayers;
     let coordinatePrecision = 13; // Default precision (decimal places)
+    let currentProjection = ''; // Default to auto-detect
+
+    // Define projection definitions
+    proj4.defs('EPSG:4326', '+proj=longlat +datum=WGS84 +no_defs +type=crs');
+    proj4.defs('EPSG:3857', '+proj=merc +a=6378137 +b=6378137 +lat_ts=0 +lon_0=0 +x_0=0 +y_0=0 +k=1 +units=m +nadgrids=@null +wktext +no_defs +type=crs');
+    proj4.defs('EPSG:900913', proj4.defs('EPSG:3857'));
+    proj4.defs('EPSG:3785', proj4.defs('EPSG:3857'));
+
+    // Define web mercator aliases for detection and replacement
+    const webMercatorCodes = ['EPSG:3857', 'EPSG:900913', 'EPSG:3785'];
 
     // Colors for bounding boxes
     const colors = [
@@ -423,11 +464,14 @@
     // Default example data
     const defaultData = `# Example bounding boxes (format: [west_lon, south_lat, east_lon, north_lat])
 # San Francisco Bay Area
-[-122.5, 37.2, -121.7, 38.0]
+bbox: [-122.5, 37.2, -121.7, 38.0]
+srs: 'EPSG:4326'
 # Yosemite National Park
-[-119.9, 37.4, -119.2, 38.0]
+bbox: [-119.9, 37.4, -119.2, 38.0]
+srs: 'EPSG:4326'
 # Lake Tahoe
-[-120.3, 38.8, -119.9, 39.3]`;
+bbox: [-120.3, 38.8, -119.9, 39.3]
+srs: 'EPSG:4326'`;
 
     // Get DOM elements
     const textarea = document.getElementById('input-textarea');
@@ -435,11 +479,156 @@
     const boxCountElement = document.getElementById('box-count');
     const mapButtons = document.querySelectorAll('.map-button');
     const precisionSelect = document.getElementById('precision-select');
+    const projectionSelect = document.getElementById('projection-select');
+    const formatExample = document.getElementById('format-example');
+
+    // Update format example based on projection
+    function updateFormatExample(projection) {
+      if (projection === 'EPSG:4326') {
+        formatExample.textContent = "Example: bbox: [-122.5, 37.2, -121.7, 38.0], srs: 'EPSG:4326'";
+      } else if (webMercatorCodes.includes(projection)) {
+        formatExample.textContent = `Example: bbox: [-13638811.83, 4474171.94, -13546541.36, 4582962.64], srs: '${projection}'`;
+      } else {
+        formatExample.textContent = "Example: bbox: [-122.5, 37.2, -121.7, 38.0], srs: 'EPSG:4326' or bbox: [-13638811.83, 4474171.94, -13546541.36, 4582962.64], srs: 'EPSG:3857'";
+      }
+    }
+
+    // Convert coordinates between projections
+    function convertCoordinates(coords, fromProj, toProj) {
+      if (fromProj === toProj || !fromProj || !toProj) {
+        return coords;
+      }
+
+      // Extract coordinates
+      const [west, south, east, north] = coords;
+
+      // Convert southwest corner
+      const [westConverted, southConverted] = proj4(fromProj, toProj, [west, south]);
+      
+      // Convert northeast corner
+      const [eastConverted, northConverted] = proj4(fromProj, toProj, [east, north]);
+
+      return [westConverted, southConverted, eastConverted, northConverted];
+    }
 
     // Round a number to the specified precision
     function roundToPrecision(num, precision) {
       const factor = Math.pow(10, precision);
       return Math.round(num * factor) / factor;
+    }
+
+    // Detect projection from input text
+    function detectProjection(text) {
+      const projectionRegex = /srs:\s*'(EPSG:\d+)'/g;
+      const matches = [...text.matchAll(projectionRegex)];
+      
+      if (matches.length > 0) {
+        // Count occurrences of each projection
+        const projectionCounts = {};
+        
+        matches.forEach(match => {
+          const proj = match[1];
+          projectionCounts[proj] = (projectionCounts[proj] || 0) + 1;
+        });
+        
+        // Find the most common projection
+        let mostCommonProj = '';
+        let maxCount = 0;
+        
+        for (const [proj, count] of Object.entries(projectionCounts)) {
+          if (count > maxCount) {
+            maxCount = count;
+            mostCommonProj = proj;
+          }
+        }
+        
+        return mostCommonProj;
+      }
+      
+      return '';
+    }
+
+    // Convert bounding box coordinates and projection in the text
+    function convertTextCoordinates(text, fromProj, toProj) {
+      if (fromProj === toProj || !fromProj || !toProj) {
+        return text;
+      }
+
+      const lines = text.split('\n');
+      const result = [];
+      let currentBox = null;
+
+      // Process each line
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmedLine = line.trim();
+        
+        // Check for bbox line
+        const bboxMatch = trimmedLine.match(/bbox:\s*\[([-\d.]+),\s*([-\d.]+),\s*([-\d.]+),\s*([-\d.]+)\]/);
+        
+        if (bboxMatch) {
+          // Found a bbox line
+          currentBox = {
+            lineIndex: i,
+            west: parseFloat(bboxMatch[1]),
+            south: parseFloat(bboxMatch[2]),
+            east: parseFloat(bboxMatch[3]),
+            north: parseFloat(bboxMatch[4]),
+            projection: fromProj // Assume the old projection by default
+          };
+        } 
+        else if (trimmedLine.match(/srs:\s*'EPSG:\d+'/) && currentBox && currentBox.lineIndex === i - 1) {
+          // Found an SRS line right after a bbox line
+          const srsMatch = trimmedLine.match(/srs:\s*'(EPSG:\d+)'/);
+          if (srsMatch) {
+            const lineProj = srsMatch[1];
+            
+            // Only convert if the line projection matches the from projection
+            if (lineProj === fromProj) {
+              // Convert the coordinates
+              const [westNew, southNew, eastNew, northNew] = convertCoordinates(
+                [currentBox.west, currentBox.south, currentBox.east, currentBox.north],
+                fromProj, 
+                toProj
+              );
+              
+              // Round the converted coordinates
+              const roundedWest = roundToPrecision(westNew, coordinatePrecision);
+              const roundedSouth = roundToPrecision(southNew, coordinatePrecision);
+              const roundedEast = roundToPrecision(eastNew, coordinatePrecision);
+              const roundedNorth = roundToPrecision(northNew, coordinatePrecision);
+              
+              // Format without trailing zeros
+              const westStr = roundedWest.toFixed(coordinatePrecision).replace(/\.?0+$/, '');
+              const southStr = roundedSouth.toFixed(coordinatePrecision).replace(/\.?0+$/, '');
+              const eastStr = roundedEast.toFixed(coordinatePrecision).replace(/\.?0+$/, '');
+              const northStr = roundedNorth.toFixed(coordinatePrecision).replace(/\.?0+$/, '');
+              
+              // Replace the bbox coordinates in the text
+              const newBboxLine = lines[currentBox.lineIndex].replace(
+                /\[([-\d.]+),\s*([-\d.]+),\s*([-\d.]+),\s*([-\d.]+)\]/, 
+                `[${westStr}, ${southStr}, ${eastStr}, ${northStr}]`
+              );
+              
+              // Update the line in our result
+              result[currentBox.lineIndex] = newBboxLine;
+              
+              // Replace the SRS string
+              result[i] = line.replace(`'${fromProj}'`, `'${toProj}'`);
+              
+              currentBox = null;
+              continue;
+            }
+          }
+        }
+        
+        // Add line to result if not already added
+        if (result.length <= i) {
+          result.push(line);
+        }
+      }
+      
+      return result.join('\n');
     }
 
     // Initialize the map
@@ -465,7 +654,6 @@
           }
         )
       };
-
 
       // Add the default base layer
       baseLayers[currentLayer].addTo(map);
@@ -507,6 +695,7 @@
     function parseInput(text) {
       const lines = text.split('\n');
       const boxes = [];
+      let currentBox = null;
 
       lines.forEach((line, index) => {
         // Skip empty lines and comments
@@ -517,34 +706,111 @@
 
         // Try to extract the bounding box coordinates
         try {
-          // Match pattern [num, num, num, num]
-          const match = trimmedLine.match(/\[([-\d.]+),\s*([-\d.]+),\s*([-\d.]+),\s*([-\d.]+)\]/);
-          if (match) {
-            const [_, west, south, east, north] = match.map(parseFloat);
+          // Match pattern bbox: [num, num, num, num]
+          const bboxMatch = trimmedLine.match(/bbox:\s*\[([-\d.]+),\s*([-\d.]+),\s*([-\d.]+),\s*([-\d.]+)\]/);
+          if (bboxMatch) {
+            const [_, west, south, east, north] = bboxMatch.map(parseFloat);
             // Validate coordinates
             if (!isNaN(west) && !isNaN(south) && !isNaN(east) && !isNaN(north)) {
-              // Round coordinates to the current precision
-              const roundedWest = roundToPrecision(west, coordinatePrecision);
-              const roundedSouth = roundToPrecision(south, coordinatePrecision);
-              const roundedEast = roundToPrecision(east, coordinatePrecision);
-              const roundedNorth = roundToPrecision(north, coordinatePrecision);
-
-              boxes.push({
-                bounds: [[roundedSouth, roundedWest], [roundedNorth, roundedEast]],
+              currentBox = {
+                west: parseFloat(west),
+                south: parseFloat(south),
+                east: parseFloat(east),
+                north: parseFloat(north),
                 color: colors[boxes.length % colors.length],
-                index,
+                index: index,
                 line: line,
-                west: roundedWest,
-                south: roundedSouth,
-                east: roundedEast,
-                north: roundedNorth
-              });
+                projection: currentProjection // Use current projection as default
+              };
             }
+          }
+
+          // Match pattern srs: 'EPSG:XXXX'
+          const srsMatch = trimmedLine.match(/srs:\s*'(EPSG:\d+)'/);
+          if (srsMatch && currentBox) {
+            currentBox.projection = srsMatch[1];
+            currentBox.srsIndex = index;
+
+            // Calculate bounds for the map (always in EPSG:4326)
+            let bounds;
+            if (currentBox.projection !== 'EPSG:4326' && webMercatorCodes.includes(currentBox.projection)) {
+              // Convert from Web Mercator to WGS84 for display
+              const wgs84Coords = convertCoordinates(
+                [currentBox.west, currentBox.south, currentBox.east, currentBox.north], 
+                currentBox.projection, 
+                'EPSG:4326'
+              );
+              
+              bounds = [[wgs84Coords[1], wgs84Coords[0]], [wgs84Coords[3], wgs84Coords[2]]];
+            } else {
+              bounds = [[currentBox.south, currentBox.west], [currentBox.north, currentBox.east]];
+            }
+            
+            currentBox.bounds = bounds;
+
+            // Add the box to the list
+            boxes.push(currentBox);
+            currentBox = null;
+          } else if (currentBox && !trimmedLine.match(/srs:/)) {
+            // If there's no SRS line following, use default projection
+            if (currentProjection) {
+              currentBox.projection = currentProjection;
+            } else {
+              currentBox.projection = 'EPSG:4326'; // Fallback to WGS84
+            }
+            
+            // Calculate bounds
+            let bounds;
+            if (currentBox.projection !== 'EPSG:4326' && webMercatorCodes.includes(currentBox.projection)) {
+              // Convert from Web Mercator to WGS84 for display
+              const wgs84Coords = convertCoordinates(
+                [currentBox.west, currentBox.south, currentBox.east, currentBox.north], 
+                currentBox.projection, 
+                'EPSG:4326'
+              );
+              
+              bounds = [[wgs84Coords[1], wgs84Coords[0]], [wgs84Coords[3], wgs84Coords[2]]];
+            } else {
+              bounds = [[currentBox.south, currentBox.west], [currentBox.north, currentBox.east]];
+            }
+            
+            currentBox.bounds = bounds;
+            
+            boxes.push(currentBox);
+            currentBox = null;
           }
         } catch (e) {
           console.error("Error parsing line:", line, e);
         }
       });
+
+      // If we have a box without a projection at the end of the text
+      if (currentBox) {
+        if (currentProjection) {
+          currentBox.projection = currentProjection;
+        } else {
+          currentBox.projection = 'EPSG:4326'; // Fallback to WGS84
+        }
+        
+        // Calculate bounds
+        let bounds;
+        if (currentBox.projection !== 'EPSG:4326' && webMercatorCodes.includes(currentBox.projection)) {
+          // Convert from Web Mercator to WGS84 for display
+          const wgs84Coords = convertCoordinates(
+            [currentBox.west, currentBox.south, currentBox.east, currentBox.north], 
+            currentBox.projection, 
+            'EPSG:4326'
+          );
+          
+          bounds = [[wgs84Coords[1], wgs84Coords[0]], [wgs84Coords[3], wgs84Coords[2]]];
+        } else {
+          bounds = [[currentBox.south, currentBox.west], [currentBox.north, currentBox.east]];
+        }
+        
+        currentBox.bounds = bounds;
+        
+        boxes.push(currentBox);
+      }
 
       return boxes;
     }
@@ -564,11 +830,17 @@
 
         // Check if this is a bounding box line
         const boxIndex = parsedBoxes.findIndex(box => box.index === index);
+        const srsIndex = parsedBoxes.findIndex(box => box.srsIndex === index);
 
         if (boxIndex >= 0) {
           // This is a bounding box line
           const boxColor = parsedBoxes[boxIndex].color;
           lineSpan.classList.add('line-bounding-box');
+          lineSpan.style.color = boxColor;
+          lineSpan.style.backgroundColor = boxColor + '20'; // 12.5% opacity
+        } else if (srsIndex >= 0) {
+          // This is an SRS line
+          const boxColor = parsedBoxes[srsIndex].color;
           lineSpan.style.color = boxColor;
           lineSpan.style.backgroundColor = boxColor + '20'; // 12.5% opacity
         } else if (line.trim().startsWith('#')) {
@@ -585,17 +857,11 @@
       // Find associated parsed box by comparing bounds
       const bounds = rectangle.getBounds();
 
-      // Round coordinates to the current precision
-      const west = roundToPrecision(bounds.getWest(), coordinatePrecision);
-      const south = roundToPrecision(bounds.getSouth(), coordinatePrecision);
-      const east = roundToPrecision(bounds.getEast(), coordinatePrecision);
-      const north = roundToPrecision(bounds.getNorth(), coordinatePrecision);
-
-      // Strip off trailing zeros
-      const westStr = west.toFixed(coordinatePrecision).replace(/\.?0+$/, '');
-      const southStr = south.toFixed(coordinatePrecision).replace(/\.?0+$/, '');
-      const eastStr = east.toFixed(coordinatePrecision).replace(/\.?0+$/, '');
-      const northStr = north.toFixed(coordinatePrecision).replace(/\.?0+$/, '');
+      // Get the map coordinates (always in EPSG:4326 in Leaflet)
+      let west = bounds.getWest();
+      let south = bounds.getSouth();
+      let east = bounds.getEast();
+      let north = bounds.getNorth();
 
       // Find the box index by checking the boxIndex property
       let boxIndex = -1;
@@ -624,15 +890,45 @@
         return;
       }
 
+      // Get the projection for this box
+      const boxProjection = parsedBoxes[boxIndex].projection || currentProjection;
+
+      // Convert coordinates if needed (Leaflet uses EPSG:4326)
+      if (boxProjection && boxProjection !== 'EPSG:4326' && webMercatorCodes.includes(boxProjection)) {
+        // Convert from WGS84 to Web Mercator for storage
+        const mercatorCoords = convertCoordinates(
+          [west, south, east, north], 
+          'EPSG:4326', 
+          boxProjection
+        );
+        
+        west = mercatorCoords[0];
+        south = mercatorCoords[1];
+        east = mercatorCoords[2];
+        north = mercatorCoords[3];
+      }
+
+      // Round coordinates to the current precision
+      const roundedWest = roundToPrecision(west, coordinatePrecision);
+      const roundedSouth = roundToPrecision(south, coordinatePrecision);
+      const roundedEast = roundToPrecision(east, coordinatePrecision);
+      const roundedNorth = roundToPrecision(north, coordinatePrecision);
+
+      // Strip off trailing zeros
+      const westStr = roundedWest.toFixed(coordinatePrecision).replace(/\.?0+$/, '');
+      const southStr = roundedSouth.toFixed(coordinatePrecision).replace(/\.?0+$/, '');
+      const eastStr = east.toFixed(coordinatePrecision).replace(/\.?0+$/, '');
+      const northStr = north.toFixed(coordinatePrecision).replace(/\.?0+$/, '');
+
       // Format the new coordinates string based on precision
       const newCoordinates = `[${westStr}, ${southStr}, ${eastStr}, ${northStr}]`;
 
-      // Update the box object
-      parsedBoxes[boxIndex].west = west;
-      parsedBoxes[boxIndex].south = south;
-      parsedBoxes[boxIndex].east = east;
-      parsedBoxes[boxIndex].north = north;
-      parsedBoxes[boxIndex].bounds = [[south, west], [north, east]];
+      // Update the box object - store in the format specified by the projection
+      parsedBoxes[boxIndex].west = roundedWest;
+      parsedBoxes[boxIndex].south = roundedSouth;
+      parsedBoxes[boxIndex].east = roundedEast;
+      parsedBoxes[boxIndex].north = roundedNorth;
+      parsedBoxes[boxIndex].bounds = [[roundedSouth, roundedWest], [roundedNorth, roundedEast]];
 
       // Get the current text and lines
       const text = textarea.value;
@@ -640,7 +936,7 @@
 
       // Replace the old coordinates in the line
       const oldLine = lines[parsedBoxes[boxIndex].index];
-      const newLine = oldLine.replace(/\[[-\d.,\s]+\]/, newCoordinates);
+      const newLine = oldLine.replace(/\[([-\d.,\s]+)\]/, newCoordinates);
 
       // Update the line in the array
       lines[parsedBoxes[boxIndex].index] = newLine;
@@ -661,12 +957,32 @@
       // Update syntax highlighting
       updateHighlighting();
 
-      // Update the actual rectangle bounds to match the rounded coordinates
-      rectangle.setBounds([[south, west], [north, east]]);
+      // Update the actual rectangle bounds on the map (always in EPSG:4326)
+      let displayBounds;
+      if (boxProjection && boxProjection !== 'EPSG:4326' && webMercatorCodes.includes(boxProjection)) {
+        // Convert from Web Mercator to WGS84 for display
+        const wgs84Coords = convertCoordinates(
+          [roundedWest, roundedSouth, roundedEast, roundedNorth], 
+          boxProjection, 
+          'EPSG:4326'
+        );
+        
+        displayBounds = L.latLngBounds([
+          [wgs84Coords[1], wgs84Coords[0]], 
+          [wgs84Coords[3], wgs84Coords[2]]
+        ]);
+      } else {
+        displayBounds = L.latLngBounds([
+          [roundedSouth, roundedWest], 
+          [roundedNorth, roundedEast]
+        ]);
+      }
+      
+      rectangle.setBounds(displayBounds);
 
       // Update the white border if it exists
       if (rectangle.whiteBorder) {
-        rectangle.whiteBorder.setBounds([[south, west], [north, east]]);
+        rectangle.whiteBorder.setBounds(displayBounds);
       }
 
       // Update the marker positions to match the new bounds
@@ -864,8 +1180,11 @@
 
       // Add new box layers
       parsedBoxes.forEach((box, index) => {
+        // Get the bounds (already properly converted in parseInput)
+        const bounds = box.bounds;
+
         // Create a white outline rectangle first (1px larger on all sides)
-        const whiteBorder = L.rectangle(box.bounds, {
+        const whiteBorder = L.rectangle(bounds, {
           color: 'white',
           weight: 2, // Slightly thicker for the outer white border
           fillOpacity: 0,
@@ -874,7 +1193,7 @@
         }).addTo(map);
 
         // Create the main colored rectangle
-        const rectangle = L.rectangle(box.bounds, {
+        const rectangle = L.rectangle(bounds, {
           color: box.color,
           weight: 1, // Thin colored border
           fillOpacity: 0.2
@@ -905,6 +1224,17 @@
     // Process input and update everything
     function processInput() {
       const inputText = textarea.value;
+      
+      // Auto-detect projection if not set
+      if (!currentProjection) {
+        const detectedProjection = detectProjection(inputText);
+        if (detectedProjection) {
+          currentProjection = detectedProjection;
+          projectionSelect.value = detectedProjection;
+          updateFormatExample(detectedProjection);
+        }
+      }
+      
       parsedBoxes = parseInput(inputText);
 
       updateHighlighting();
@@ -941,6 +1271,61 @@
       });
     }
 
+    // Handle projection change
+    function handleProjectionChange() {
+      const newProjection = projectionSelect.value;
+      const oldProjection = currentProjection;
+      
+      // If auto-detect is selected, try to detect projection
+      if (!newProjection) {
+        const detectedProjection = detectProjection(textarea.value);
+        if (detectedProjection) {
+          currentProjection = detectedProjection;
+          projectionSelect.value = detectedProjection;
+          updateFormatExample(detectedProjection);
+        } else {
+          currentProjection = '';
+          updateFormatExample('');
+        }
+        return;
+      }
+      
+      // Save the projection to localStorage
+      try {
+        localStorage.setItem('boundingBoxMapProjection', newProjection);
+      } catch (e) {
+        console.warn('Failed to save projection to localStorage:', e);
+      }
+      
+      // Convert coordinates and replace projection in the text
+      if (oldProjection && oldProjection !== newProjection) {
+        textarea.value = convertTextCoordinates(textarea.value, oldProjection, newProjection);
+      }
+      
+      currentProjection = newProjection;
+      updateFormatExample(newProjection);
+      
+      // Re-process the input with the new projection
+      processInput();
+    }
+
+    // Handle paste event to auto-detect projection
+    function handlePaste(e) {
+      // Process after the paste happens
+      setTimeout(() => {
+        if (!currentProjection) {
+          const detectedProjection = detectProjection(textarea.value);
+          if (detectedProjection) {
+            currentProjection = detectedProjection;
+            projectionSelect.value = detectedProjection;
+            updateFormatExample(detectedProjection);
+          }
+        }
+        
+        processInput();
+      }, 0);
+    }
+
     // Initialize everything
     function init() {
       // Try to load saved content from localStorage
@@ -960,6 +1345,22 @@
           coordinatePrecision = parseInt(savedPrecision);
           precisionSelect.value = savedPrecision;
         }
+
+        // Load saved projection setting
+        const savedProjection = localStorage.getItem('boundingBoxMapProjection');
+        if (savedProjection) {
+          currentProjection = savedProjection;
+          projectionSelect.value = savedProjection;
+          updateFormatExample(savedProjection);
+        } else {
+          // Auto-detect projection from text
+          const detectedProjection = detectProjection(textarea.value);
+          if (detectedProjection) {
+            currentProjection = detectedProjection;
+            projectionSelect.value = detectedProjection;
+            updateFormatExample(detectedProjection);
+          }
+        }
       } catch (e) {
         console.warn('Failed to load from localStorage:', e);
         // Fall back to default data
@@ -969,11 +1370,15 @@
       // Set up precision selector
       precisionSelect.addEventListener('change', handlePrecisionChange);
 
+      // Set up projection selector
+      projectionSelect.addEventListener('change', handleProjectionChange);
+
       // Initialize the map
       initMap();
 
       // Set up the text input events
       textarea.addEventListener('input', handleTextareaInput);
+      textarea.addEventListener('paste', handlePaste);
 
       // Process initial input
       processInput();
