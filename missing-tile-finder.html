@@ -261,16 +261,26 @@
             try {
                 // Clear current options
                 zoomLevelSelect.innerHTML = '';
+                
+                const zoomLevels = [];
 
                 // Try to list all directories in the selected folder
                 // These should be zoom levels
                 for await (const entry of directoryHandle.values()) {
                     if (entry.kind === 'directory' && !isNaN(parseInt(entry.name))) {
-                        const option = document.createElement('option');
-                        option.value = entry.name;
-                        option.textContent = entry.name;
-                        zoomLevelSelect.appendChild(option);
+                        zoomLevels.push(parseInt(entry.name));
                     }
+                }
+                
+                // Sort zoom levels numerically
+                zoomLevels.sort((a, b) => a - b);
+                
+                // Add sorted options to select
+                for (const zoom of zoomLevels) {
+                    const option = document.createElement('option');
+                    option.value = zoom;
+                    option.textContent = zoom;
+                    zoomLevelSelect.appendChild(option);
                 }
 
                 // If no zoom levels found, add default options
