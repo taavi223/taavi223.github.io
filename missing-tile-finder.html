@@ -381,6 +381,7 @@
 
         function resetCheckUI() {
             checkingInProgress = false;
+            abortController.abort();
             abortController = null;
             checkBtn.textContent = "Check Missing Tiles";
             // Keep progress bar visible to show the final result
@@ -462,7 +463,7 @@
                 statusDiv.textContent = 'Scanning and plotting tiles...';
                 console.log("Starting tile scan and plot...");
 
-                const result = await scanAndPlotTiles(zoomDirHandle, zoom);
+                const result = await scanAndPlotTiles(zoomDirHandle, zoom, abortController);
 
                 if (result.tileCount === 0) {
                     statusDiv.textContent = 'No tiles found at zoom level ' + zoom + '.';
@@ -484,7 +485,7 @@
             }
         }
 
-        async function scanAndPlotTiles(zoomDirHandle, zoom) {
+        async function scanAndPlotTiles(zoomDirHandle, zoom, innerAbortController) {
             console.log("Starting tile scan and plot...");
             let minX = Infinity, maxX = -Infinity;
             let minY = Infinity, maxY = -Infinity;
@@ -534,7 +535,7 @@
 
                 // Process each X directory in order
                 for (let i = 0; i < xDirs.length; i++) {
-                    if (abortController.signal.aborted) {
+                    if (innerAbortController.signal.aborted) {
                         throw new DOMException('Tile checking was aborted', 'AbortError');
                     }
 
