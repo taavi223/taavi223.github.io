@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P-Q Curve Calculator</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>P-Q Curve Calculator</h1>
+            <p>Calculate system operating points for fan and filter combinations</p>
+        </header>
+
+        <main>
+            <div class="controls-section">
+                <div class="controls-grid">
+                    <div class="control-group">
+                        <h3>Filter Configuration</h3>
+                        <div class="input-group">
+                            <label for="filter-select">Filter Media:</label>
+                            <select id="filter-select">
+                                <option value="">Select filter media...</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="filter-size">Filter Size:</label>
+                            <select id="filter-size">
+                                <option value="">Select size...</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="filter-quantity">Quantity:</label>
+                            <input type="number" id="filter-quantity" min="1" max="20" value="1">
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <h3>Fan Configuration</h3>
+                        <div class="input-group">
+                            <label for="fan-select">Fan Model:</label>
+                            <select id="fan-select">
+                                <option value="">Select a fan...</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="fan-quantity">Quantity:</label>
+                            <input type="number" id="fan-quantity" min="1" max="10" value="1">
+                        </div>
+                    </div>
+                </div>
+                <button id="share-build" class="share-button">
+                    <!-- https://icons.getbootstrap.com/icons/copy/ -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                        class="bi bi-copy" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd"
+                            d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zM2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h1v1a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1v1z" />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="results-section">
+                <div class="chart-container">
+                    <canvas id="pq-chart"></canvas>
+                </div>
+
+                <div class="operating-point">
+                    <h3>Operating Point</h3>
+                    <div id="operating-point-display">
+                        <p>Select fan and filter to see operating point</p>
+                    </div>
+                    
+                    <div class="settings-section">
+                        <h4>Settings</h4>
+                        <div class="input-group">
+                            <label class="toggle-label">
+                                <span>Pressure Units:</span>
+                                <div class="unit-toggle">
+                                    <input type="checkbox" id="unit-toggle">
+                                    <span class="slider"></span>
+                                    <span class="unit-labels">
+                                        <span class="unit-mm">mm H₂O</span>
+                                        <span class="unit-inches">in H₂O</span>
+                                    </span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
